@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scrapeAllBoards } from "@/lib/scraper";
-import { initDb, getSearchConfig, insertJob, getJobs, updateJobStatus, updateJobFit, getJobById, getUserProfile, getResumes, getTodayApplyCount } from "@/lib/db";
+import { initDb, getSearchConfig, insertJob, getJobs, updateJobStatus, updateJobFit, getJobById, getUserProfile, getResumes, getTodayApplyCount, ensureUserRows } from "@/lib/db";
+import { requireUserId } from "@/lib/session";
 import { analyzeJobFit } from "@/lib/ai";
 import type { JobStatus, JobBoard } from "@/lib/types";
 
@@ -9,12 +10,13 @@ import type { JobStatus, JobBoard } from "@/lib/types";
  */
 export async function GET(req: NextRequest) {
   try {
+    const userId = await requireUserId();
     await initDb();
 
     // Return status counts for stats bar
     const wantCounts = req.nextUrl.searchParams.get("counts");
     if (wantCounts) {
-      const jobs = await getJobs(undefined, 10000);
+      const jobs = await getJobs(userId, undefined, 10000);
       const counts = {
         total: jobs.length,
         matched: jobs.filter((j) => j.status === "matched").length,
@@ -27,7 +29,7 @@ export async function GET(req: NextRequest) {
 
     const status = req.nextUrl.searchParams.get("status") as JobStatus | null;
     const limit = parseInt(req.nextUrl.searchParams.get("limit") ?? "200", 10);
-    const jobs = await getJobs(status ?? undefined, limit);
+    const jobs = await getJobs(userId, status ?? undefined, limit);
     return NextResponse.json({ success: true, data: jobs });
   } catch (error) {
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
@@ -40,24 +42,25 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    const userId = await requireUserId();
     await initDb();
     const body = await req.json();
     const { action } = body;
 
     switch (action) {
       case "scrape": {
-        const config = await getSearchConfig();
+        const config = await getSearchConfig(userId);
         if (config.keywords.length === 0) {
           return NextResponse.json({ success: false, error: "No search keywords configured." }, { status: 400 });
         }
         const boards = config.boards.length > 0 ? config.boards : (["weworkremotely", "remoteok"] as JobBoard[]);
-        const jobs = await scrapeAllBoards(boards, config.keywords);
+        const jobs = await scrapeAllBoards(boards, config.keywords, userId);
 
         // Insert new jobs into DB
         let inserted = 0;
         for (const job of jobs) {
           try {
-            await insertJob(job);
+            await insertJob(job, userId);
             inserted++;
           } catch {
             // Duplicate URL, skip
@@ -68,19 +71,19 @@ export async function POST(req: NextRequest) {
       }
 
       case "analyze": {
-        const profile = await getUserProfile();
-        const resumes = await getResumes();
+        const profile = await getUserProfile(userId);
+        const resumes = await getResumes(userId);
         if (resumes.length === 0) {
           return NextResponse.json({ success: false, error: "Upload at least one resume first." }, { status: 400 });
         }
 
-        const newJobs = await getJobs("new", 50);
+        const newJobs = await getJobs(userId, "new", 50);
         const results = [];
 
         for (const job of newJobs) {
           try {
             const analysis = await analyzeJobFit(job, profile, resumes);
-            await updateJobFit(job.id, analysis.score, analysis.coverLetter, analysis.bestResumeId);
+            await updateJobFit(job.id, analysis.score, analysis.coverLetter, analysis.bestResumeId, userId);
             results.push({ id: job.id, score: analysis.score });
           } catch (error) {
             console.error(`Analysis failed for job ${job.id}:`, error);
@@ -98,8 +101,8 @@ export async function POST(req: NextRequest) {
 
         // Check daily limit
         if (status === "applied") {
-          const config = await getSearchConfig();
-          const todayCount = await getTodayApplyCount();
+          const config = await getSearchConfig(userId);
+          const todayCount = await getTodayApplyCount(userId);
           if (todayCount >= config.maxDailyApplies) {
             return NextResponse.json({
               success: false,
@@ -108,7 +111,7 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        await updateJobStatus(jobId, status, notes);
+        await updateJobStatus(jobId, status, userId, notes);
         return NextResponse.json({ success: true });
       }
 

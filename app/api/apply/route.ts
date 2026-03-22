@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, getJobById, getUserProfile, getResumes, insertApplicationLog, updateJobStatus, getTodayApplyCount, getSearchConfig } from "@/lib/db";
+import { requireUserId } from "@/lib/session";
 
 const IS_SERVERLESS = !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION_NAME || !!process.env.VERCEL;
 
@@ -9,6 +10,7 @@ const IS_SERVERLESS = !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION
  */
 export async function POST(req: NextRequest) {
   try {
+    const userId = await requireUserId();
     await initDb();
     const { jobId } = await req.json();
     if (!jobId) {
@@ -16,8 +18,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Check daily limit
-    const config = await getSearchConfig();
-    const todayCount = await getTodayApplyCount();
+    const config = await getSearchConfig(userId);
+    const todayCount = await getTodayApplyCount(userId);
     if (todayCount >= config.maxDailyApplies) {
       return NextResponse.json({
         success: false,
@@ -25,17 +27,17 @@ export async function POST(req: NextRequest) {
       }, { status: 429 });
     }
 
-    const job = await getJobById(jobId);
+    const job = await getJobById(jobId, userId);
     if (!job) {
       return NextResponse.json({ success: false, error: "Job not found" }, { status: 404 });
     }
 
-    const profile = await getUserProfile();
+    const profile = await getUserProfile(userId);
     if (!profile.fullName || !profile.email) {
       return NextResponse.json({ success: false, error: "Please configure your profile first." }, { status: 400 });
     }
 
-    const resumes = await getResumes();
+    const resumes = await getResumes(userId);
     const resume = resumes.find((r) => r.id === job.resumeUsed) ?? resumes[0];
     if (!resume) {
       return NextResponse.json({ success: false, error: "No resumes uploaded." }, { status: 400 });
@@ -62,9 +64,9 @@ export async function POST(req: NextRequest) {
       status: result.success ? "applied" : "failed",
       notes: result.message,
       appliedAt: new Date().toISOString(),
-    });
+    }, userId);
 
-    await updateJobStatus(job.id, result.success ? "applied" : "failed", result.message);
+    await updateJobStatus(job.id, result.success ? "applied" : "failed", userId, result.message);
 
     return NextResponse.json({
       success: true,

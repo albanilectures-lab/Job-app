@@ -26,7 +26,7 @@ export function getAuthUrl(): string {
 /**
  * Exchange authorization code for tokens and persist them.
  */
-export async function exchangeCode(code: string): Promise<void> {
+export async function exchangeCode(code: string, userId: string): Promise<void> {
   const oauth2 = getOAuth2Client();
   const { tokens } = await oauth2.getToken(code);
 
@@ -34,18 +34,31 @@ export async function exchangeCode(code: string): Promise<void> {
     throw new Error("Missing tokens from Google OAuth exchange");
   }
 
+  // Fetch the connected email address
+  let email: string | undefined;
+  try {
+    oauth2.setCredentials({ access_token: tokens.access_token });
+    const gmail = google.gmail({ version: "v1", auth: oauth2 });
+    const profile = await gmail.users.getProfile({ userId: "me" });
+    email = profile.data.emailAddress ?? undefined;
+  } catch {
+    // Non-critical — continue without email
+  }
+
   await saveGmailTokens(
     tokens.access_token,
     tokens.refresh_token,
-    tokens.expiry_date ?? Date.now() + 3600 * 1000
+    tokens.expiry_date ?? Date.now() + 3600 * 1000,
+    userId,
+    email
   );
 }
 
 /**
  * Get an authenticated Gmail client item (refreshing token if needed).
  */
-async function getGmailClient() {
-  const tokens = await getGmailTokens();
+async function getGmailClient(userId: string) {
+  const tokens = await getGmailTokens(userId);
   if (!tokens) throw new Error("Gmail not connected. Please authenticate first.");
 
   const oauth2 = getOAuth2Client();
@@ -61,7 +74,8 @@ async function getGmailClient() {
     await saveGmailTokens(
       credentials.access_token!,
       credentials.refresh_token ?? tokens.refreshToken,
-      credentials.expiry_date ?? Date.now() + 3600 * 1000
+      credentials.expiry_date ?? Date.now() + 3600 * 1000,
+      userId
     );
   }
 
@@ -72,8 +86,8 @@ async function getGmailClient() {
  * Check inbox for application-related replies.
  * Returns a list of recent messages related to job applications.
  */
-export async function checkApplicationReplies(maxResults = 20) {
-  const gmail = await getGmailClient();
+export async function checkApplicationReplies(userId: string, maxResults = 20) {
+  const gmail = await getGmailClient(userId);
 
   const response = await gmail.users.messages.list({
     userId: "me",
@@ -105,10 +119,4 @@ export async function checkApplicationReplies(maxResults = 20) {
   return results;
 }
 
-/**
- * Check if Gmail is connected (tokens exist and are valid).
- */
-export async function isGmailConnected(): Promise<boolean> {
-  const tokens = await getGmailTokens();
-  return !!tokens && !!tokens.accessToken;
-}
+

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, insertResume, getResumes, deleteResume } from "@/lib/db";
+import { requireUserId } from "@/lib/session";
 import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import { MAX_RESUMES } from "@/lib/constants";
@@ -11,8 +12,9 @@ const UPLOAD_DIR = path.join(process.cwd(), "public", "resumes");
  */
 export async function GET() {
   try {
+    const userId = await requireUserId();
     await initDb();
-    const resumes = await getResumes();
+    const resumes = await getResumes(userId);
     return NextResponse.json({ success: true, data: resumes });
   } catch (error) {
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
@@ -25,8 +27,9 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   try {
+    const userId = await requireUserId();
     await initDb();
-    const existing = await getResumes();
+    const existing = await getResumes(userId);
     if (existing.length >= MAX_RESUMES) {
       return NextResponse.json(
         { success: false, error: `Max ${MAX_RESUMES} resumes. Delete one first.` },
@@ -66,7 +69,7 @@ export async function POST(req: NextRequest) {
       filePath,
       skills,
       uploadedAt: new Date().toISOString(),
-    });
+    }, userId);
 
     return NextResponse.json({ success: true, data: resume });
   } catch (error) {
@@ -79,13 +82,14 @@ export async function POST(req: NextRequest) {
  */
 export async function DELETE(req: NextRequest) {
   try {
+    const userId = await requireUserId();
     await initDb();
     const { id } = await req.json();
     if (!id) {
       return NextResponse.json({ success: false, error: "Resume ID required" }, { status: 400 });
     }
 
-    const resumes = await getResumes();
+    const resumes = await getResumes(userId);
     const resume = resumes.find((r) => r.id === id);
     if (resume) {
       try {
@@ -95,7 +99,7 @@ export async function DELETE(req: NextRequest) {
       }
     }
 
-    await deleteResume(id);
+    await deleteResume(id, userId);
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 });

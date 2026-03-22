@@ -23,6 +23,7 @@ export default function SearchConfigPanel({ config, onSave }: SearchConfigPanelP
   // Session state
   const [sessions, setSessions] = useState<string[]>([]);
   const [loggingIn, setLoggingIn] = useState<string | null>(null);
+  const [pendingLogin, setPendingLogin] = useState<string | null>(null);
   const [loginMsg, setLoginMsg] = useState<{ board: string; text: string; ok: boolean } | null>(null);
 
   const fetchSessions = useCallback(async () => {
@@ -43,19 +44,31 @@ export default function SearchConfigPanel({ config, onSave }: SearchConfigPanelP
     setLoggingIn(board);
     setLoginMsg(null);
     try {
+      // Get the login URL from the API and open it in a new tab
       const res = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ board }),
+        body: JSON.stringify({ board, action: "getLoginUrl" }),
       });
       const data = await res.json();
-      setLoginMsg({ board, text: data.message, ok: res.ok });
-      if (res.ok) await fetchSessions();
+      if (data.loginUrl) {
+        window.open(data.loginUrl, "_blank");
+        setPendingLogin(board);
+        setLoginMsg({ board, text: "Login page opened in a new tab. Sign in there, then come back and click \"Done\".", ok: true });
+      } else {
+        setLoginMsg({ board, text: data.error || "No login URL for this board.", ok: false });
+      }
     } catch (err: any) {
       setLoginMsg({ board, text: err.message, ok: false });
     } finally {
       setLoggingIn(null);
     }
+  };
+
+  const handleLoginDone = (board: string) => {
+    setPendingLogin(null);
+    setSessions((prev) => (prev.includes(board) ? prev : [...prev, board]));
+    setLoginMsg({ board, text: "Marked as logged in.", ok: true });
   };
 
   const handleLogout = async (board: string) => {
@@ -201,6 +214,13 @@ export default function SearchConfigPanel({ config, onSave }: SearchConfigPanelP
                         <LogOut size={12} /> Logout
                       </button>
                     </>
+                  ) : pendingLogin === board ? (
+                    <button
+                      onClick={() => handleLoginDone(board)}
+                      className="ml-auto inline-flex items-center gap-1 text-xs bg-green-600 text-white px-3 py-1.5 rounded-md hover:bg-green-700"
+                    >
+                      <CheckCircle size={12} /> Done
+                    </button>
                   ) : (
                     <button
                       onClick={() => handleLogin(board)}

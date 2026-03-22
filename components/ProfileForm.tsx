@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { UserProfile } from "@/lib/types";
 import { User, Save } from "lucide-react";
 
@@ -13,6 +13,12 @@ export default function ProfileForm({ profile, onSave }: ProfileFormProps) {
   const [form, setForm] = useState<UserProfile>(profile);
   const [skillInput, setSkillInput] = useState(profile.skills.join(", "));
   const [saving, setSaving] = useState(false);
+
+  // Sync form when profile prop changes (e.g. after resume extraction)
+  useEffect(() => {
+    setForm(profile);
+    setSkillInput(profile.skills.join(", "));
+  }, [profile]);
 
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 

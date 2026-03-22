@@ -1,9 +1,14 @@
-import { chromium, type Browser, type Page, type BrowserContext } from "playwright";
+import { chromium as playwrightChromium, type Browser, type Page, type BrowserContext } from "playwright";
+import { chromium as stealthChromium } from "playwright-extra";
+import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import path from "path";
 import fs from "fs";
 import type { Job, UserProfile, Resume, JobBoard } from "./types";
 import { USER_AGENTS, DELAY_RANGE, PAGE_LOAD_TIMEOUT, JOB_BOARD_CONFIGS } from "./constants";
 import { randomPick, randomDelay } from "./utils";
+
+// Apply stealth plugin
+stealthChromium.use(StealthPlugin());
 
 // ─── Paths ───────────────────────────────────────────────────
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -89,6 +94,7 @@ function getDomain(url: string): string {
 
 /**
  * Launch a browser with anti-detection measures.
+ * Uses the user's installed Chrome (not Chromium) + stealth plugin.
  * If a board is specified and has a saved session, loads that session.
  */
 export async function launchBrowser(board?: string): Promise<BrowserContext> {
@@ -125,39 +131,59 @@ export async function launchBrowser(board?: string): Promise<BrowserContext> {
     try { if (fs.existsSync(lf)) fs.unlinkSync(lf); } catch { /* ignore */ }
   }
 
-  const contextOptions: any = {
-    headless: false,
-    args: [
-      "--disable-blink-features=AutomationControlled",
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-infobars",
-      "--window-size=1366,768",
-    ],
-    userAgent: randomPick(USER_AGENTS),
-    viewport: { width: 1366, height: 768 },
-    locale: "en-US",
-    timezoneId: "America/New_York",
-  };
+  const ua = randomPick(USER_AGENTS);
 
-  // Launch with persistent profile — makes browser look like a returning user
-  // and avoids Cloudflare captcha loops
+  const launchArgs = [
+    "--disable-blink-features=AutomationControlled",
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-infobars",
+    "--disable-dev-shm-usage",
+    "--window-size=1366,768",
+    "--disable-features=IsolateOrigins,site-per-process",
+  ];
+
+  // Try to use the user's real Chrome via channel: 'chrome'.
+  // This avoids the Chromium bot detection fingerprint.
   try {
-    contextInstance = await chromium.launchPersistentContext(BROWSER_PROFILE_DIR, contextOptions);
-  } catch (err) {
-    // If profile is corrupted, fall back to a regular browser
-    console.warn("[Browser] Persistent context failed, falling back to regular launch:", String(err));
-    const browser = await chromium.launch({
+    contextInstance = await stealthChromium.launchPersistentContext(BROWSER_PROFILE_DIR, {
+      channel: "chrome",
       headless: false,
-      args: contextOptions.args,
+      args: launchArgs,
+      userAgent: ua,
+      viewport: { width: 1366, height: 768 },
+      locale: "en-US",
+      timezoneId: "America/New_York",
+      ignoreDefaultArgs: ["--enable-automation"],
     });
-    browserInstance = browser;
-    contextInstance = await browser.newContext({
-      userAgent: contextOptions.userAgent,
-      viewport: contextOptions.viewport,
-      locale: contextOptions.locale,
-      timezoneId: contextOptions.timezoneId,
-    });
+    console.log("[Browser] Launched with real Chrome + stealth");
+  } catch (err) {
+    console.warn("[Browser] Real Chrome not available, falling back to Chromium + stealth:", String(err));
+    try {
+      contextInstance = await stealthChromium.launchPersistentContext(BROWSER_PROFILE_DIR, {
+        headless: false,
+        args: launchArgs,
+        userAgent: ua,
+        viewport: { width: 1366, height: 768 },
+        locale: "en-US",
+        timezoneId: "America/New_York",
+        ignoreDefaultArgs: ["--enable-automation"],
+      });
+    } catch (err2) {
+      // If persistent context fails, fall back to regular launch
+      console.warn("[Browser] Persistent context failed, using regular browser:", String(err2));
+      const browser = await stealthChromium.launch({
+        headless: false,
+        args: launchArgs,
+      });
+      browserInstance = browser;
+      contextInstance = await browser.newContext({
+        userAgent: ua,
+        viewport: { width: 1366, height: 768 },
+        locale: "en-US",
+        timezoneId: "America/New_York",
+      });
+    }
   }
 
   currentSessionBoard = board ?? null;
@@ -176,13 +202,24 @@ export async function launchBrowser(board?: string): Promise<BrowserContext> {
     }
   }
 
-  // Anti-detection scripts
+  // Additional anti-detection overrides on top of stealth plugin
   await contextInstance.addInitScript(() => {
+    // Ensure webdriver property is false
     Object.defineProperty(navigator, "webdriver", { get: () => false });
+    // Mock Chrome runtime
     // @ts-ignore
-    window.chrome = { runtime: {}, loadTimes: () => ({}), csi: () => ({}) };
-    Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
-    Object.defineProperty(navigator, "languages", { get: () => ["en-US", "en"] });
+    if (!window.chrome) window.chrome = {};
+    // @ts-ignore
+    window.chrome.runtime = window.chrome.runtime || {};
+    // Set realistic plugin count
+    Object.defineProperty(navigator, "plugins", {
+      get: () => [1, 2, 3, 4, 5],
+    });
+    // Realistic languages
+    Object.defineProperty(navigator, "languages", {
+      get: () => ["en-US", "en"],
+    });
+    // Override permissions query for notifications
     const originalQuery = window.navigator.permissions.query;
     // @ts-ignore
     window.navigator.permissions.query = (params: any) =>
@@ -213,7 +250,8 @@ export async function closeBrowser(): Promise<void> {
 
 /**
  * Open a browser to a board's login page so the user can log in manually.
- * After login, save the session. Returns when the user navigates away from login.
+ * Uses real Chrome so Google SSO works. Waits for user to complete login + CAPTCHA.
+ * After login, saves the session for future automated use.
  */
 export async function manualLogin(board: JobBoard): Promise<{ success: boolean; message: string }> {
   const config = JOB_BOARD_CONFIGS[board];
@@ -227,23 +265,25 @@ export async function manualLogin(board: JobBoard): Promise<{ success: boolean; 
   try {
     await page.goto(config.loginUrl, { waitUntil: "domcontentloaded", timeout: PAGE_LOAD_TIMEOUT });
 
-    // Wait for user to solve any captcha and complete login.
-    // Detect login success by: URL no longer containing login/auth/sign_in keywords,
-    // OR common logged-in indicators (logout links, avatar, dashboard elements).
-    console.log(`[Login] Waiting for manual login to ${config.name} (solve any captcha first)...`);
+    console.log(`[Login] Browser opened for ${config.name}. Please:`);
+    console.log(`  1. Log in with your credentials (email/password or Google)`);
+    console.log(`  2. Solve any CAPTCHA that appears`);
+    console.log(`  3. Wait until you see the dashboard/home page`);
+    console.log(`  → Session will be saved automatically.`);
 
-    // Wait up to 10 minutes — user may need to solve captcha + enter credentials
+    // Wait up to 10 minutes for user to complete login + CAPTCHA
+    // Detect success by: URL no longer on login/auth pages, OR logged-in indicators appear
     await page.waitForFunction(
       (loginUrl: string) => {
         const url = window.location.href.toLowerCase();
-        const loginKeywords = ["login", "sign_in", "signin", "auth", "captcha", "challenge"];
-        const stillOnLogin = loginKeywords.some((kw) => url.includes(kw)) || url === loginUrl;
+        const loginKeywords = ["login", "sign_in", "signin", "auth", "captcha", "challenge", "verify"];
+        const stillOnLogin = loginKeywords.some((kw) => url.includes(kw)) || url === loginUrl.toLowerCase();
         if (!stillOnLogin) return true;
-        // Also check for logged-in indicators on the page itself
+        // Also check for logged-in indicators on the page
         const loggedIn = document.querySelector(
           'a[href*="logout"], a[href*="sign_out"], a[href*="signout"], ' +
           '[class*="avatar"], [class*="user-menu"], [class*="profile"], ' +
-          '[data-testid="user-menu"], [class*="account"]'
+          '[data-testid="user-menu"], [class*="account"], [class*="dashboard"]'
         );
         return !!loggedIn;
       },
@@ -259,6 +299,63 @@ export async function manualLogin(board: JobBoard): Promise<{ success: boolean; 
     return { success: true, message: `Logged in to ${config.name}. Session saved for future use.` };
   } catch (error) {
     return { success: false, message: `Login flow error: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
+// ─── CAPTCHA Detection & Wait ────────────────────────────────
+
+/**
+ * Detect if a CAPTCHA or human verification is present on the page.
+ * If found, wait for the user to solve it (up to 5 minutes).
+ */
+async function waitForCaptchaIfPresent(page: Page): Promise<void> {
+  const captchaSelectors = [
+    'iframe[src*="recaptcha"]',
+    'iframe[src*="hcaptcha"]',
+    'iframe[src*="captcha"]',
+    '[class*="captcha" i]',
+    '[id*="captcha" i]',
+    '#challenge-running',
+    '#challenge-stage',
+    '.cf-turnstile',
+    '[data-sitekey]',
+    'iframe[src*="challenges.cloudflare"]',
+  ];
+
+  let hasCaptcha = false;
+  for (const sel of captchaSelectors) {
+    try {
+      if (await page.locator(sel).count() > 0) {
+        hasCaptcha = true;
+        break;
+      }
+    } catch { /* ignore */ }
+  }
+
+  if (!hasCaptcha) return;
+
+  console.log("[CAPTCHA] Detected! Please solve it in the browser window...");
+
+  // Wait up to 5 minutes for the CAPTCHA to disappear
+  try {
+    await page.waitForFunction(() => {
+      const selectors = [
+        'iframe[src*="recaptcha"]',
+        'iframe[src*="hcaptcha"]',
+        '[class*="captcha" i]',
+        '#challenge-running',
+        '#challenge-stage',
+        '.cf-turnstile',
+      ];
+      for (const sel of selectors) {
+        if (document.querySelector(sel)) return false;
+      }
+      return true;
+    }, undefined, { timeout: 300000 });
+    console.log("[CAPTCHA] Solved! Continuing...");
+    await randomDelay(1000, 2000);
+  } catch {
+    console.log("[CAPTCHA] Timeout waiting for solution, continuing anyway...");
   }
 }
 
@@ -289,6 +386,9 @@ export async function autoFillApplication(
 
     await page.goto(job.url, { waitUntil: "domcontentloaded", timeout: PAGE_LOAD_TIMEOUT });
     await randomDelay(DELAY_RANGE.min, DELAY_RANGE.max);
+
+    // Check for CAPTCHA before proceeding
+    await waitForCaptchaIfPresent(page);
 
     // Check if we need login
     const isLoginPage = await detectLoginPage(page);
@@ -321,11 +421,11 @@ export async function autoFillApplication(
         const targetPage = popupPages[popupPages.length - 1];
         try {
           await targetPage.waitForLoadState("domcontentloaded", { timeout: 15000 });
-          // Wait a bit more for JS-heavy ATS forms (Ashby, Lever) to render
           await randomDelay(1500, 3000);
-          // Some ATS pages redirect again after initial load (e.g. /application page)
           await targetPage.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
         } catch { /* might already be loaded */ }
+        // Check for CAPTCHA on the new tab
+        await waitForCaptchaIfPresent(targetPage);
         const targetDomain = getDomain(targetPage.url());
         const learnedMap = formMaps[targetDomain] ?? {};
         context.off("page", pageHandler);
@@ -333,10 +433,12 @@ export async function autoFillApplication(
       }
 
       // No new tab — check if the current page navigated (e.g. same-tab redirect)
-      // Wait for any pending navigation
       try {
         await page.waitForLoadState("networkidle", { timeout: 8000 });
       } catch { /* timeout OK */ }
+
+      // Check for CAPTCHA after navigation
+      await waitForCaptchaIfPresent(page);
     }
 
     context.off("page", pageHandler);
@@ -646,6 +748,9 @@ export async function scrapeWithSession(
         const url = `https://www.glassdoor.com/Job/jobs.htm?sc.keyword=${encodeURIComponent(query)}&remoteWorkType=1`;
         await page.goto(url, { waitUntil: "domcontentloaded", timeout: PAGE_LOAD_TIMEOUT });
         await randomDelay(3000, 5000);
+
+        // Wait for CAPTCHA if Glassdoor shows one
+        await waitForCaptchaIfPresent(page);
 
         const cards = page.locator("[data-test='jobListing'], .JobsList_jobListItem__JBBUQ, li[data-id]");
         const count = Math.min(await cards.count(), 25);

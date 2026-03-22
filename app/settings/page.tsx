@@ -80,6 +80,33 @@ export default function SettingsPage() {
     setResumes((prev) => prev.filter((r) => r.id !== id));
   };
 
+  const handleProfileExtracted = async (extracted: UserProfile) => {
+    // Merge: only fill empty fields, don't overwrite existing data
+    const merged: UserProfile = profile
+      ? {
+          fullName: profile.fullName || extracted.fullName,
+          email: profile.email || extracted.email,
+          phone: profile.phone || extracted.phone,
+          linkedinUrl: profile.linkedinUrl || extracted.linkedinUrl,
+          githubUrl: profile.githubUrl || extracted.githubUrl,
+          portfolioUrl: profile.portfolioUrl || extracted.portfolioUrl,
+          skills: profile.skills.length > 0 ? profile.skills : extracted.skills,
+          yearsExperience: profile.yearsExperience || extracted.yearsExperience,
+        }
+      : extracted;
+    setProfile(merged);
+    // Auto-save to DB
+    try {
+      await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "saveProfile", profile: merged }),
+      });
+    } catch (err) {
+      console.error("Failed to auto-save extracted profile:", err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-gray-500">
@@ -93,7 +120,7 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
 
       {profile && <ProfileForm profile={profile} onSave={handleSaveProfile} />}
-      <ResumeUploader resumes={resumes} onUpload={handleUploadResume} onDelete={handleDeleteResume} />
+      <ResumeUploader resumes={resumes} onUpload={handleUploadResume} onDelete={handleDeleteResume} onProfileExtracted={handleProfileExtracted} />
       {searchConfig && <SearchConfigPanel config={searchConfig} onSave={handleSaveConfig} />}
       <GmailConnect />
     </div>

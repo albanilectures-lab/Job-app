@@ -6,7 +6,7 @@ const nextConfig = {
     },
   },
   webpack: (config, { isServer }) => {
-    config.externals = [...(config.externals || []), "playwright"];
+    config.externals = [...(config.externals || []), "playwright", "playwright-extra", "puppeteer-extra-plugin-stealth", "puppeteer-extra-plugin", "clone-deep", "merge-deep", "canvas", "tesseract.js", "pdfjs-dist", "pdfjs-dist/legacy/build/pdf.js"];
     return config;
   },
 };

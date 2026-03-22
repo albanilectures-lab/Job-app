@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import { exportToExcel } from "@/lib/excel";
 import { initDb } from "@/lib/db";
+import { requireUserId } from "@/lib/session";
 
 /**
  * GET /api/export — download application log as Excel file
  */
 export async function GET() {
   try {
+    const userId = await requireUserId();
     await initDb();
-    const buffer = await exportToExcel();
+    const buffer = await exportToExcel(userId);
 
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,

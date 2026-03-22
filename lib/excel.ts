@@ -5,9 +5,9 @@ import { getApplicationLogs, getJobs, getUserProfile } from "./db";
  * Export job data to an Excel file matching the "2026 Job Bid List" template.
  * Columns: No, Date, Job Title, Company, Stack, Bid Name, Salary Range, Site Link
  */
-export async function exportToExcel(): Promise<Buffer> {
-  const jobs = await getJobs(undefined, 1000);
-  const profile = await getUserProfile();
+export async function exportToExcel(userId: string): Promise<Buffer> {
+  const jobs = await getJobs(userId, undefined, 1000);
+  const profile = await getUserProfile(userId);
   const bidName = profile.fullName || "—";
 
   const workbook = new ExcelJS.Workbook();

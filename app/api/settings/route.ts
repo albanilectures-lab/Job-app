@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDb, getUserProfile, updateUserProfile, getSearchConfig, updateSearchConfig } from "@/lib/db";
+import { initDb, getUserProfile, updateUserProfile, getSearchConfig, updateSearchConfig, ensureUserRows } from "@/lib/db";
+import { requireUserId } from "@/lib/session";
 import type { UserProfile, SearchConfig } from "@/lib/types";
 
 /**
@@ -7,9 +8,11 @@ import type { UserProfile, SearchConfig } from "@/lib/types";
  */
 export async function GET() {
   try {
+    const userId = await requireUserId();
     await initDb();
-    const profile = await getUserProfile();
-    const searchConfig = await getSearchConfig();
+    await ensureUserRows(userId);
+    const profile = await getUserProfile(userId);
+    const searchConfig = await getSearchConfig(userId);
     return NextResponse.json({ success: true, data: { profile, searchConfig } });
   } catch (error) {
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
@@ -21,19 +24,21 @@ export async function GET() {
  */
 export async function POST(req: NextRequest) {
   try {
+    const userId = await requireUserId();
     await initDb();
+    await ensureUserRows(userId);
     const body = await req.json();
     const { action } = body;
 
     switch (action) {
       case "saveProfile": {
         const profile = body.profile as UserProfile;
-        await updateUserProfile(profile);
+        await updateUserProfile(profile, userId);
         return NextResponse.json({ success: true });
       }
       case "saveConfig": {
         const config = body.config as SearchConfig;
-        await updateSearchConfig(config);
+        await updateSearchConfig(config, userId);
         return NextResponse.json({ success: true });
       }
       default:

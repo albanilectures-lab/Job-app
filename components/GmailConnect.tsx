@@ -5,6 +5,7 @@ import { Mail, Check, Loader2, ExternalLink } from "lucide-react";
 
 export default function GmailConnect() {
   const [connected, setConnected] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [replies, setReplies] = useState<any[]>([]);
 
@@ -17,6 +18,7 @@ export default function GmailConnect() {
       const res = await fetch("/api/gmail");
       const data = await res.json();
       setConnected(data.data?.connected ?? false);
+      setEmail(data.data?.email ?? null);
     } catch {
       setConnected(false);
     } finally {
@@ -59,9 +61,12 @@ export default function GmailConnect() {
         </div>
       ) : connected ? (
         <div>
-          <div className="flex items-center gap-2 text-sm text-green-600 mb-3">
+          <div className="flex items-center gap-2 text-sm text-green-600 mb-1">
             <Check size={16} /> Connected to Gmail
           </div>
+          {email && (
+            <p className="text-sm text-gray-500 mb-3 ml-6">{email}</p>
+          )}
           <button
             onClick={handleCheckReplies}
             className="text-sm bg-indigo-50 text-indigo-600 px-4 py-2 rounded-lg hover:bg-indigo-100"

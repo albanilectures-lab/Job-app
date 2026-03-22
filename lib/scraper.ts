@@ -29,7 +29,8 @@ function resolveUrl(href: string, baseUrl: string): string {
  */
 export async function scrapeAllBoards(
   boards: JobBoard[],
-  keywords: string[]
+  keywords: string[],
+  userId: string
 ): Promise<Job[]> {
   await initDb();
   const allJobs: Job[] = [];
@@ -50,7 +51,7 @@ export async function scrapeAllBoards(
   const validJobs = allJobs.filter(filterJob);
   const filtered: Job[] = [];
   for (const j of validJobs) {
-    if (!(await jobUrlExists(j.url))) {
+    if (!(await jobUrlExists(j.url, userId))) {
       filtered.push(j);
     }
   }

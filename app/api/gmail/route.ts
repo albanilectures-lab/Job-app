@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUrl, exchangeCode, isGmailConnected, checkApplicationReplies } from "@/lib/gmail";
-import { initDb } from "@/lib/db";
+import { getAuthUrl, exchangeCode, checkApplicationReplies } from "@/lib/gmail";
+import { initDb, isGmailConnected } from "@/lib/db";
+import { requireUserId } from "@/lib/session";
 
 /**
  * GET /api/gmail — check status or get auth URL
  */
 export async function GET(req: NextRequest) {
   try {
+    const userId = await requireUserId();
     await initDb();
     const action = req.nextUrl.searchParams.get("action");
 
@@ -16,12 +18,12 @@ export async function GET(req: NextRequest) {
     }
 
     if (action === "replies") {
-      const replies = await checkApplicationReplies();
+      const replies = await checkApplicationReplies(userId);
       return NextResponse.json({ success: true, data: replies });
     }
 
-    const connected = await isGmailConnected();
-    return NextResponse.json({ success: true, data: { connected } });
+    const status = await isGmailConnected(userId);
+    return NextResponse.json({ success: true, data: status });
   } catch (error) {
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
   }
@@ -32,13 +34,14 @@ export async function GET(req: NextRequest) {
  */
 export async function POST(req: NextRequest) {
   try {
+    const userId = await requireUserId();
     await initDb();
     const { code } = await req.json();
     if (!code) {
       return NextResponse.json({ success: false, error: "Authorization code required" }, { status: 400 });
     }
 
-    await exchangeCode(code);
+    await exchangeCode(code, userId);
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 });

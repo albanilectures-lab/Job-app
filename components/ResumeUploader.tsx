@@ -1,24 +1,67 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Upload, X, FileText, Tag } from "lucide-react";
-import type { Resume } from "@/lib/types";
+import { Upload, X, FileText, Tag, Sparkles } from "lucide-react";
+import type { Resume, UserProfile } from "@/lib/types";
 
 interface ResumeUploaderProps {
   resumes: Resume[];
   onUpload: (file: File, label: string, skills: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onProfileExtracted?: (profile: UserProfile) => void;
   maxResumes?: number;
 }
 
-export default function ResumeUploader({ resumes, onUpload, onDelete, maxResumes = 8 }: ResumeUploaderProps) {
+export default function ResumeUploader({ resumes, onUpload, onDelete, onProfileExtracted, maxResumes = 8 }: ResumeUploaderProps) {
   const [label, setLabel] = useState("");
   const [skills, setSkills] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [autoFill, setAutoFill] = useState(true);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const pendingFileRef = useRef<File | null>(null);
 
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const extractProfileFromFile = async (file: File | Blob, filename: string) => {
+    setExtracting(true);
+    setMessage({ type: "success", text: "Extracting profile info from resume..." });
+    try {
+      const form = new FormData();
+      form.append("file", file, filename);
+      const res = await fetch("/api/resumes/parse", { method: "POST", body: form });
+      const data = await res.json();
+      if (data.success && data.data) {
+        onProfileExtracted?.(data.data);
+        setMessage({ type: "success", text: "Profile info extracted and filled!" });
+        if (!skills.trim() && data.data.skills?.length) {
+          setSkills(data.data.skills.join(", "));
+        }
+      } else {
+        setMessage({ type: "error", text: data.error || "Failed to extract profile info." });
+      }
+    } catch (err) {
+      setMessage({ type: "error", text: "Extraction failed: " + String(err) });
+    } finally {
+      setExtracting(false);
+    }
+  };
+
+  const extractProfile = async (file: File) => {
+    await extractProfileFromFile(file, file.name);
+  };
+
+  const extractFromExisting = async (resume: Resume) => {
+    try {
+      const res = await fetch(`/resumes/${resume.filename}`);
+      if (!res.ok) throw new Error("Could not fetch resume file");
+      const blob = await res.blob();
+      await extractProfileFromFile(blob, resume.filename);
+    } catch (err) {
+      setMessage({ type: "error", text: "Failed to load resume: " + String(err) });
+    }
+  };
 
   const handleUpload = async (file: File) => {
     if (!file.name.endsWith(".pdf")) {
@@ -29,12 +72,20 @@ export default function ResumeUploader({ resumes, onUpload, onDelete, maxResumes
       setMessage({ type: "error", text: "Please enter a label (e.g. C#_AWS_Angular)" });
       return;
     }
+
+    // Extract profile if auto-fill is on
+    if (autoFill && onProfileExtracted) {
+      pendingFileRef.current = file;
+      await extractProfile(file);
+    }
+
     setUploading(true);
     setMessage(null);
     try {
       await onUpload(file, label.trim(), skills.trim());
       setLabel("");
       setSkills("");
+      pendingFileRef.current = null;
       if (fileRef.current) fileRef.current.value = "";
       setMessage({ type: "success", text: "Resume uploaded successfully!" });
       setTimeout(() => setMessage(null), 3000);
@@ -73,13 +124,25 @@ export default function ResumeUploader({ resumes, onUpload, onDelete, maxResumes
                   </div>
                 )}
               </div>
-              <button
-                onClick={() => onDelete(r.id)}
-                className="text-gray-400 hover:text-red-500 p-1 flex-shrink-0"
-                title="Delete resume"
-              >
-                <X size={16} />
-              </button>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                {onProfileExtracted && (
+                  <button
+                    onClick={() => extractFromExisting(r)}
+                    disabled={extracting}
+                    className="text-indigo-500 hover:text-indigo-700 p-1 disabled:opacity-50"
+                    title="Extract profile from this resume"
+                  >
+                    <Sparkles size={16} />
+                  </button>
+                )}
+                <button
+                  onClick={() => onDelete(r.id)}
+                  className="text-gray-400 hover:text-red-500 p-1"
+                  title="Delete resume"
+                >
+                  <X size={16} />
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -113,6 +176,19 @@ export default function ResumeUploader({ resumes, onUpload, onDelete, maxResumes
             </div>
           </div>
 
+          {onProfileExtracted && (
+            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={autoFill}
+                onChange={(e) => setAutoFill(e.target.checked)}
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <Sparkles size={14} className="text-amber-500" />
+              Auto-fill profile from resume (uses AI)
+            </label>
+          )}
+
           <div
             className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${dragOver ? "border-indigo-500 bg-indigo-50" : "border-gray-300 hover:border-indigo-400"}`}
             onClick={() => fileRef.current?.click()}
@@ -127,7 +203,7 @@ export default function ResumeUploader({ resumes, onUpload, onDelete, maxResumes
           >
             <Upload size={24} className="mx-auto mb-2 text-gray-400" />
             <p className="text-sm text-gray-600">
-              {uploading ? "Uploading..." : "Drop PDF here or click to browse"}
+              {extracting ? "Extracting profile info..." : uploading ? "Uploading..." : "Drop PDF here or click to browse"}
             </p>
             <input
               ref={fileRef}

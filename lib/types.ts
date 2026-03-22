@@ -33,7 +33,8 @@ export type JobBoard =
   | "ziprecruiter"
   | "builtin"
   | "greenhouse"
-  | "lever";
+  | "lever"
+  | "unitedhealthgroup";
 
 // ─── Resume Types ────────────────────────────────────────────
 export interface Resume {

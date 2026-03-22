@@ -128,6 +128,13 @@ export const JOB_BOARD_CONFIGS: Record<
     baseUrl: "https://jobs.lever.co",
     type: "scrape",
   },
+  unitedhealthgroup: {
+    name: "UnitedHealth Group",
+    baseUrl: "https://www.unitedhealthgroup.com",
+    type: "scrape",
+    requiresLogin: true,
+    loginUrl: "https://careers.unitedhealthgroup.com/",
+  },
 };
 
 // ─── Defaults ────────────────────────────────────────────────
