@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { scrapeAllBoards } from "@/lib/scraper";
 import { initDb, getSearchConfig, insertJob, getJobs, updateJobStatus, updateJobFit, getJobById, getUserProfile, getResumes, getTodayApplyCount, ensureUserRows } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
-import { analyzeJobFit } from "@/lib/ai";
 import type { JobStatus, JobBoard } from "@/lib/types";
 
 /**
@@ -54,6 +52,7 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ success: false, error: "No search keywords configured." }, { status: 400 });
         }
         const boards = config.boards.length > 0 ? config.boards : (["weworkremotely", "remoteok"] as JobBoard[]);
+        const { scrapeAllBoards } = await import("@/lib/scraper");
         const jobs = await scrapeAllBoards(boards, config.keywords, userId);
 
         // Insert new jobs into DB
@@ -79,6 +78,8 @@ export async function POST(req: NextRequest) {
 
         const newJobs = await getJobs(userId, "new", 50);
         const results = [];
+
+        const { analyzeJobFit } = await import("@/lib/ai");
 
         for (const job of newJobs) {
           try {

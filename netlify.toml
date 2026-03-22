@@ -1,10 +1,5 @@
 [build]
   command = "npm run build"
-  publish = ".next"
-
-[functions]
-  # Extend serverless function timeout (max 26s on free tier)
-  external_node_modules = ["canvas", "tesseract.js", "pdfjs-dist"]
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
