@@ -3,6 +3,7 @@ node_modules/
 data/app.db
 data/browser-profile/
 public/resumes/*.pdf
+public/sql-wasm.wasm
 .env.local
 .env
 *.tsbuildinfo

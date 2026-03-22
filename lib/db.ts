@@ -5,7 +5,10 @@ import fs from "fs";
 import { v4 as uuid } from "uuid";
 import type { Job, ApplicationLog, Resume, UserProfile, SearchConfig, JobStatus } from "./types";
 
-const DB_PATH = path.join(process.cwd(), "data", "app.db");
+const IS_SERVERLESS = !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION_NAME || !!process.env.VERCEL;
+const DB_PATH = IS_SERVERLESS
+  ? path.join("/tmp", "app.db")
+  : path.join(process.cwd(), "data", "app.db");
 
 let _db: SqlJsDatabase | null = null;
 let _sqlPromise: Promise<any> | null = null;
@@ -21,10 +24,27 @@ async function getDbAsync(): Promise<SqlJsDatabase> {
   if (_db) return _db;
 
   if (!_sqlPromise) {
-    _sqlPromise = initSqlJs({
-      locateFile: (file: string) =>
-        path.join(process.cwd(), "node_modules", "sql.js", "dist", file),
-    });
+    _sqlPromise = (async () => {
+      // Try multiple paths to find the WASM binary
+      const wasmPaths = [
+        path.join(process.cwd(), "node_modules", "sql.js", "dist", "sql-wasm.wasm"),
+        path.join(process.cwd(), "public", "sql-wasm.wasm"),
+        path.join(process.cwd(), ".next", "server", "sql-wasm.wasm"),
+        path.join(__dirname, "..", "node_modules", "sql.js", "dist", "sql-wasm.wasm"),
+      ];
+
+      for (const wasmPath of wasmPaths) {
+        try {
+          if (fs.existsSync(wasmPath)) {
+            const wasmBinary = fs.readFileSync(wasmPath);
+            return await initSqlJs({ wasmBinary });
+          }
+        } catch { /* try next path */ }
+      }
+
+      // Last resort: let sql.js try to locate it on its own
+      return await initSqlJs();
+    })();
   }
   const SQL = await _sqlPromise;
 
