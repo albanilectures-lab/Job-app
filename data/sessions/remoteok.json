@@ -1,0 +1,117 @@
+{
+  "cookies": [
+    {
+      "name": "_GRECAPTCHA",
+      "value": "09AKhCRwi3CSyq4vYodvRQKeUQUYo3IgNcmZoVk7BAFzKN4D_GTc0XqDBS1ZlhELypEUG157MmPDnTIZiqjZJxwHs",
+      "domain": "www.recaptcha.net",
+      "path": "/recaptcha",
+      "expires": 1789519035.984017,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "__utma",
+      "value": "62252842.434870205.1774015519.1774015519.1774015519.1",
+      "domain": ".weworkremotely.com",
+      "path": "/",
+      "expires": 1808575519.228673,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "cf_clearance",
+      "value": "NNHEkCSdTc5JlYNJF7i8Rpg4nBdupJDBiD.htxMcS30-1774015520-1.2.1.1-HSixqk2mHmHcP87HtowY60z0YiM3FPbh_B09pilHf3I2gTF7wwiVcrcktYsN0FB1gcQRUCMmCXs.c4phjvd.uAPTPRYR2tGW6uHgwL8VIJiqWn8.N_utlZ7Kg2kxFunYdyYav0WJvWxGNh66TpggtvzQ4OkhPSFKRASWb50cE9Doh7joQ8x9zPBSeunc4RbtUPfi4VfwwU8TSNwmNWfWs1MeTo19i04ibct_15uddRg",
+      "domain": ".weworkremotely.com",
+      "path": "/",
+      "expires": 1805551520.960813,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None",
+      "partitionKey": "https://weworkremotely.com",
+      "_crHasCrossSiteAncestor": false
+    },
+    {
+      "name": "new_user",
+      "value": "true",
+      "domain": ".remoteok.com",
+      "path": "/",
+      "expires": 1805627978,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_dd_s",
+      "value": "aid=8d43bf57-fd43-46eb-9b04-64712a9050c7&rum=0&expire=1773968003475",
+      "domain": "jobs.ashbyhq.com",
+      "path": "/",
+      "expires": 1805503103,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "__Host-GAPS",
+      "value": "1:29UIcMIOg6kj8DO7UfSXdzpJCO5JdA:bzHEpez9uVJyGakG",
+      "domain": "accounts.google.com",
+      "path": "/",
+      "expires": 1808601175.124647,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "OTZ",
+      "value": "8528953_72_76_104100_72_446760",
+      "domain": "accounts.google.com",
+      "path": "/",
+      "expires": 1776633184,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "chatbase_anon_id",
+      "value": "c0672993-1aec-45f5-b7ce-3952a0f9aa1b",
+      "domain": ".remoteok.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "NID",
+      "value": "529=qve7MoCUOMDTd9w38AXCPCt2JmlenoWxpVGT_tiMBOykmX-Rb0JA6qL8CbngNk-WtYLZnowq6KUwTlpUncXUneke11u42Jnq92wcjQ0THGd1DNFdxPBcP5FrS2K_bT6zHCjRkG9c7LodTS9Ins-KwtOer9xLia7FDz5vs-vpIusLWUwi4iZOdRvSHtkYSe6Y9GXzT28KqF973Z4n",
+      "domain": ".google.com",
+      "path": "/",
+      "expires": 1789852386.394816,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "visit_count",
+      "value": "5",
+      "domain": ".remoteok.com",
+      "path": "/",
+      "expires": 1776683978,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://www.google.com",
+      "localStorage": [
+        {
+          "name": "rc::a",
+          "value": "dHR4Z3JtMXZqcW1xeA=="
+        }
+      ]
+    }
+  ]
+}

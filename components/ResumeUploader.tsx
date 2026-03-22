@@ -1,0 +1,153 @@
+"use client";
+
+import { useState, useRef } from "react";
+import { Upload, X, FileText, Tag } from "lucide-react";
+import type { Resume } from "@/lib/types";
+
+interface ResumeUploaderProps {
+  resumes: Resume[];
+  onUpload: (file: File, label: string, skills: string) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
+  maxResumes?: number;
+}
+
+export default function ResumeUploader({ resumes, onUpload, onDelete, maxResumes = 8 }: ResumeUploaderProps) {
+  const [label, setLabel] = useState("");
+  const [skills, setSkills] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const handleUpload = async (file: File) => {
+    if (!file.name.endsWith(".pdf")) {
+      setMessage({ type: "error", text: "Only PDF files are accepted." });
+      return;
+    }
+    if (!label.trim()) {
+      setMessage({ type: "error", text: "Please enter a label (e.g. C#_AWS_Angular)" });
+      return;
+    }
+    setUploading(true);
+    setMessage(null);
+    try {
+      await onUpload(file, label.trim(), skills.trim());
+      setLabel("");
+      setSkills("");
+      if (fileRef.current) fileRef.current.value = "";
+      setMessage({ type: "success", text: "Resume uploaded successfully!" });
+      setTimeout(() => setMessage(null), 3000);
+    } catch (err) {
+      setMessage({ type: "error", text: "Upload failed: " + String(err) });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+      <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <FileText size={20} className="text-indigo-600" />
+        Resumes ({resumes.length}/{maxResumes})
+      </h2>
+
+      {/* Uploaded Resumes */}
+      {resumes.length > 0 && (
+        <div className="space-y-2 mb-4">
+          {resumes.map((r) => (
+            <div key={r.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-800 truncate">{r.label}</p>
+                <p className="text-xs text-gray-500">{r.filename}</p>
+                {r.skills.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {r.skills.slice(0, 6).map((s) => (
+                      <span key={s} className="text-xs bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded">
+                        {s}
+                      </span>
+                    ))}
+                    {r.skills.length > 6 && (
+                      <span className="text-xs text-gray-400">+{r.skills.length - 6}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => onDelete(r.id)}
+                className="text-gray-400 hover:text-red-500 p-1 flex-shrink-0"
+                title="Delete resume"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Upload form */}
+      {resumes.length < maxResumes && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-gray-600 font-medium flex items-center gap-1 mb-1">
+                <Tag size={12} /> Label
+              </label>
+              <input
+                type="text"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="e.g. C#_AWS_Angular"
+                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-300 focus:border-indigo-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-600 font-medium mb-1 block">Skills (comma-separated)</label>
+              <input
+                type="text"
+                value={skills}
+                onChange={(e) => setSkills(e.target.value)}
+                placeholder="e.g. C#, AWS, Angular, .NET"
+                className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-300 focus:border-indigo-500 outline-none"
+              />
+            </div>
+          </div>
+
+          <div
+            className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${dragOver ? "border-indigo-500 bg-indigo-50" : "border-gray-300 hover:border-indigo-400"}`}
+            onClick={() => fileRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              const file = e.dataTransfer.files[0];
+              if (file) handleUpload(file);
+            }}
+          >
+            <Upload size={24} className="mx-auto mb-2 text-gray-400" />
+            <p className="text-sm text-gray-600">
+              {uploading ? "Uploading..." : "Drop PDF here or click to browse"}
+            </p>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".pdf"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleUpload(file);
+              }}
+            />
+          </div>
+
+          {message && (
+            <p className={`text-sm font-medium ${message.type === "success" ? "text-green-600" : "text-red-600"}`}>
+              {message.text}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

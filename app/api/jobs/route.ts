@@ -1,0 +1,121 @@
+import { NextRequest, NextResponse } from "next/server";
+import { scrapeAllBoards } from "@/lib/scraper";
+import { initDb, getSearchConfig, insertJob, getJobs, updateJobStatus, updateJobFit, getJobById, getUserProfile, getResumes, getTodayApplyCount } from "@/lib/db";
+import { analyzeJobFit } from "@/lib/ai";
+import type { JobStatus, JobBoard } from "@/lib/types";
+
+/**
+ * GET /api/jobs — list jobs, optional ?status=matched
+ */
+export async function GET(req: NextRequest) {
+  try {
+    await initDb();
+
+    // Return status counts for stats bar
+    const wantCounts = req.nextUrl.searchParams.get("counts");
+    if (wantCounts) {
+      const jobs = getJobs(undefined, 10000);
+      const counts = {
+        total: jobs.length,
+        matched: jobs.filter((j) => j.status === "matched").length,
+        applied: jobs.filter((j) => j.status === "applied").length,
+        skipped: jobs.filter((j) => j.status === "skipped").length,
+        failed: jobs.filter((j) => j.status === "failed").length,
+      };
+      return NextResponse.json({ success: true, counts });
+    }
+
+    const status = req.nextUrl.searchParams.get("status") as JobStatus | null;
+    const limit = parseInt(req.nextUrl.searchParams.get("limit") ?? "200", 10);
+    const jobs = getJobs(status ?? undefined, limit);
+    return NextResponse.json({ success: true, data: jobs });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
+  }
+}
+
+/**
+ * POST /api/jobs — trigger a scrape + AI analysis
+ * Body: { action: "scrape" | "analyze" | "updateStatus", ... }
+ */
+export async function POST(req: NextRequest) {
+  try {
+    await initDb();
+    const body = await req.json();
+    const { action } = body;
+
+    switch (action) {
+      case "scrape": {
+        const config = getSearchConfig();
+        if (config.keywords.length === 0) {
+          return NextResponse.json({ success: false, error: "No search keywords configured." }, { status: 400 });
+        }
+        const boards = config.boards.length > 0 ? config.boards : (["weworkremotely", "remoteok"] as JobBoard[]);
+        const jobs = await scrapeAllBoards(boards, config.keywords);
+
+        // Insert new jobs into DB
+        let inserted = 0;
+        for (const job of jobs) {
+          try {
+            insertJob(job);
+            inserted++;
+          } catch {
+            // Duplicate URL, skip
+          }
+        }
+
+        return NextResponse.json({ success: true, data: { scraped: jobs.length, inserted } });
+      }
+
+      case "analyze": {
+        const profile = getUserProfile();
+        const resumes = getResumes();
+        if (resumes.length === 0) {
+          return NextResponse.json({ success: false, error: "Upload at least one resume first." }, { status: 400 });
+        }
+
+        const newJobs = getJobs("new", 50);
+        const results = [];
+
+        for (const job of newJobs) {
+          try {
+            const analysis = await analyzeJobFit(job, profile, resumes);
+            updateJobFit(job.id, analysis.score, analysis.coverLetter, analysis.bestResumeId);
+            results.push({ id: job.id, score: analysis.score });
+          } catch (error) {
+            console.error(`Analysis failed for job ${job.id}:`, error);
+          }
+        }
+
+        return NextResponse.json({ success: true, data: { analyzed: results.length, results } });
+      }
+
+      case "updateStatus": {
+        const { jobId, status, notes } = body as { jobId: string; status: JobStatus; notes?: string };
+        if (!jobId || !status) {
+          return NextResponse.json({ success: false, error: "jobId and status required" }, { status: 400 });
+        }
+
+        // Check daily limit
+        if (status === "applied") {
+          const config = getSearchConfig();
+          const todayCount = getTodayApplyCount();
+          if (todayCount >= config.maxDailyApplies) {
+            return NextResponse.json({
+              success: false,
+              error: `Daily application limit reached (${config.maxDailyApplies}). Try again tomorrow.`,
+            }, { status: 429 });
+          }
+        }
+
+        updateJobStatus(jobId, status, notes);
+        return NextResponse.json({ success: true });
+      }
+
+      default:
+        return NextResponse.json({ success: false, error: `Unknown action: ${action}` }, { status: 400 });
+    }
+  } catch (error) {
+    return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
+  }
+}

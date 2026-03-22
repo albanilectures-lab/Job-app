@@ -1,0 +1,6 @@
+{
+  "remoteok.com": {
+    "input[placeholder*=\"name\" i]": "name",
+    "input[placeholder*=\"email\" i]": "email"
+  }
+}

@@ -1,0 +1,194 @@
+{
+  "cookies": [
+    {
+      "name": "_jobs_session",
+      "value": "gnFgXzgLGmaiSD850%2BSIPgLf8IBL3IuJXM2D8jF2yGZAeiNDD8poNLv9WXhbWNA84eUNih5OfxEgBKw0tWaA42a8fTByOyDvP6otFiQAkJsf%2BlergxFULVlRZHcHkKJFf3iZHl2lHSBaO%2B3Gf5tjajheSFZM9MuqQBgDfUT4BpeXGiA0ggCicnYSb%2Bw2GzJvWx4L9PDNlkKPgl0NlWdIh3xdyK7w%2FkDIava2Ad%2FPnQmiPMMyVfduFk7%2BsK0qD6wsfq0ThYFVhwC%2BCnkMTv3s9hUB49miruBqdFfhNmZo80XWSA%2B94tTiNSEPUIO%2BCfNIexEm74ngLtpVSvTxiI0wmksreuGtgL4pmG7uRvDe3xmADekYxCjwVThasWQZjvK4LDuRiz7C3Vu%2F3SUWuVPxr%2Fw%2BzJfK%2FuWkT0Oi1w1syp4A37ur4pJfpZZh0qTijBCINO6qYni90fPcfUkjpbXjLEmwriWhWZsEivpSLFAWQLICjK3ph7IKqZdHGcltE5UsIOrECFk6ODF4snRCLZQgOc0%3D--KXzy4v0dnqysa90L--ldvULBndXxDJswS89Z6f1A%3D%3D",
+      "domain": "weworkremotely.com",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "mp_99ddda0976d92bf476bc0e761111062a_mixpanel",
+      "value": "%7B%22distinct_id%22%3A%22%24device%3Ab913e778-2e5b-4452-aade-2c6af3edee4a%22%2C%22%24device_id%22%3A%22b913e778-2e5b-4452-aade-2c6af3edee4a%22%2C%22%24initial_referrer%22%3A%22%24direct%22%2C%22%24initial_referring_domain%22%3A%22%24direct%22%2C%22__mps%22%3A%7B%7D%2C%22__mpso%22%3A%7B%22%24initial_referrer%22%3A%22%24direct%22%2C%22%24initial_referring_domain%22%3A%22%24direct%22%7D%2C%22__mpus%22%3A%7B%7D%2C%22__mpa%22%3A%7B%7D%2C%22__mpu%22%3A%7B%7D%2C%22__mpr%22%3A%5B%5D%2C%22__mpap%22%3A%5B%5D%7D",
+      "domain": ".weworkremotely.com",
+      "path": "/",
+      "expires": 1805502669,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_gid",
+      "value": "GA1.2.726792732.1773966671",
+      "domain": ".weworkremotely.com",
+      "path": "/",
+      "expires": 1774053070,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_gcl_au",
+      "value": "1.1.1269020785.1773966671",
+      "domain": ".weworkremotely.com",
+      "path": "/",
+      "expires": 1781742671,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "cf_clearance",
+      "value": "zXDXk945WLHs7sFIu46.oG59_sYd5tBBHaGi9WfVeew-1773966671-1.2.1.1-pmE3FK2ZhV67JKsGAxmIJMxBO.fL_aT27geWRWO1MIDDZwh2fF7hwnGBkJVfMOUI4EB3JbjStUgNWnbdwyx6BNq4tV13bzhrhnH7TQ9Ux.2CBri2YaR0Z4LMAlkpYZugMsIW0.dp1.2Hl4_qt8PtpMDRx6WWF9m82z2leBnjKR6nwE9wHdcqM8enTA2mMsUcOLlUKkQ4vx1hBTDjmrwgVqF1b9MSOkRXB6GBROTAoMA",
+      "domain": ".weworkremotely.com",
+      "path": "/",
+      "expires": 1805502671.487525,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None",
+      "partitionKey": "https://weworkremotely.com",
+      "_crHasCrossSiteAncestor": false
+    },
+    {
+      "name": "_twpid",
+      "value": "tw.1773966671506.142923876173336047",
+      "domain": ".weworkremotely.com",
+      "path": "/",
+      "expires": 1807662671.511454,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Strict"
+    },
+    {
+      "name": "_ga",
+      "value": "GA1.1.1482835257.1773966671",
+      "domain": ".weworkremotely.com",
+      "path": "/",
+      "expires": 1808526671.704367,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_fbp",
+      "value": "fb.1.1773966672203.340989292831542291",
+      "domain": ".weworkremotely.com",
+      "path": "/",
+      "expires": 1781742674,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "IDE",
+      "value": "AHWqTUkdNRGQtzjjBiCllwWL7-z3MGQ_zwNdqliWTTiTHsGrj8bg9OeXfS7jh9_X",
+      "domain": ".doubleclick.net",
+      "path": "/",
+      "expires": 1808526672.561236,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "CLID",
+      "value": "d1108be132874d609733ead632791b53.20260320.20270320",
+      "domain": "www.clarity.ms",
+      "path": "/",
+      "expires": 1805502674.96314,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "ph_phc_JbRJSQucuwgiuHCQFWI8Z2kd3uCnLOFVnKYuSzkJYHP_posthog",
+      "value": "%7B%22%24device_id%22%3A%22019d08a7-3ae0-7440-891c-5658b28091d0%22%2C%22distinct_id%22%3A%22019d08a7-3ae0-7440-891c-5658b28091d0%22%2C%22%24sesid%22%3A%5B1773966675054%2C%22019d08a7-3b4a-71ef-8716-427b30d1052b%22%2C1773966670609%5D%2C%22%24initial_person_info%22%3A%7B%22r%22%3A%22%24direct%22%2C%22u%22%3A%22https%3A%2F%2Fweworkremotely.com%2Fremote-jobs%2Fthe-church-of-jesus-christ-of-latter-day-saints-frontend-web-development-grader-byu-pathway-worldwide-1%22%7D%2C%22%24user_state%22%3A%22anonymous%22%7D",
+      "domain": ".weworkremotely.com",
+      "path": "/",
+      "expires": 1805502675,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "_ga_HFDNXM8BDG",
+      "value": "GS2.1.s1773966671$o1$g0$t1773966675$j56$l0$h0",
+      "domain": ".weworkremotely.com",
+      "path": "/",
+      "expires": 1808526675.093717,
+      "httpOnly": false,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "lidc",
+      "value": "\"b=TGST08:s=T:r=T:a=T:p=T:g=3231:u=1:x=1:i=1773966677:t=1774053077:v=2:sig=AQGtFVurL2rPMmcqiNcsDOrmznZs-TLG\"",
+      "domain": ".linkedin.com",
+      "path": "/",
+      "expires": 1774053076.885935,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "bcookie",
+      "value": "\"v=2&5ec3b3a1-4bc8-442c-81b6-180a8503520c\"",
+      "domain": ".linkedin.com",
+      "path": "/",
+      "expires": 1805502676.885666,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None"
+    },
+    {
+      "name": "cf_chl_rc_ni",
+      "value": "2",
+      "domain": "weworkremotely.com",
+      "path": "/",
+      "expires": 1773970496,
+      "httpOnly": false,
+      "secure": true,
+      "sameSite": "None",
+      "partitionKey": "https://weworkremotely.com",
+      "_crHasCrossSiteAncestor": false
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://weworkremotely.com",
+      "localStorage": [
+        {
+          "name": "lastExternalReferrer",
+          "value": "empty"
+        },
+        {
+          "name": "_gcl_ls",
+          "value": "{\"schema\":\"gcl\",\"version\":1,\"gcl_ctr\":{\"value\":{\"value\":0,\"timeouts\":0,\"errors\":0,\"creationTimeMs\":1773966671367},\"expires\":1781742671367}}"
+        },
+        {
+          "name": "lastExternalReferrerTime",
+          "value": "1773966672159"
+        },
+        {
+          "name": "ph_phc_JbRJSQucuwgiuHCQFWI8Z2kd3uCnLOFVnKYuSzkJYHP_posthog",
+          "value": "{\"$initialization_time\":\"2026-03-20T00:31:10.556Z\",\"$configured_session_timeout_ms\":1800000,\"distinct_id\":\"019d08a7-3ae0-7440-891c-5658b28091d0\",\"$device_id\":\"019d08a7-3ae0-7440-891c-5658b28091d0\",\"$user_state\":\"anonymous\",\"$capture_rate_limit\":{\"tokens\":99,\"last\":1773966675049},\"$initial_person_info\":{\"r\":\"$direct\",\"u\":\"https://weworkremotely.com/remote-jobs/the-church-of-jesus-christ-of-latter-day-saints-frontend-web-development-grader-byu-pathway-worldwide-1\"},\"$sesid\":[1773966675054,\"019d08a7-3b4a-71ef-8716-427b30d1052b\",1773966670609],\"$client_session_props\":{\"sessionId\":\"019d08a7-3b4a-71ef-8716-427b30d1052b\",\"props\":{\"r\":\"$direct\",\"u\":\"https://weworkremotely.com/remote-jobs/the-church-of-jesus-christ-of-latter-day-saints-frontend-web-development-grader-byu-pathway-worldwide-1\"}},\"$error_tracking_suppression_rules\":[],\"$session_recording_remote_config\":{\"cache_timestamp\":1773966670799,\"enabled\":false,\"networkPayloadCapture\":{\"capturePerformance\":{\"network_timing\":true,\"web_vitals\":false,\"web_vitals_allowed_metrics\":null}},\"canvasRecording\":{},\"sampleRate\":null,\"minimumDurationMilliseconds\":null},\"$autocapture_disabled_server_side\":true,\"$product_tours_enabled_server_side\":false,\"$heatmaps_enabled_server_side\":false,\"$web_vitals_enabled_server_side\":false,\"$web_vitals_allowed_metrics\":null,\"$exception_capture_enabled_server_side\":false,\"$dead_clicks_enabled_server_side\":false}"
+        },
+        {
+          "name": "li_adsId",
+          "value": "46d8811c-3835-41b1-81d0-596c66dba441"
+        }
+      ]
+    },
+    {
+      "origin": "https://challenges.cloudflare.com",
+      "localStorage": [
+        {
+          "name": "cf.turnstile.u",
+          "value": "_z0VvsTvm1ok6IwHYBM1u9IVNMa3TYi1OBFfqHN61Fw-1773966676-1.3.1.1-JBgFmNooarTOh3wY1adCohnd3YL5lYZbLJdObiGJ2tKXicHAY35ygtf_gR1C13Ec._zC2.Zy1p.VNWRDckrVLA"
+        }
+      ]
+    }
+  ]
+}
