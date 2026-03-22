@@ -7,9 +7,6 @@ const nextConfig = {
   },
   webpack: (config, { isServer }) => {
     config.externals = [...(config.externals || []), "playwright"];
-    if (isServer) {
-      config.externals.push("sql.js");
-    }
     return config;
   },
 };

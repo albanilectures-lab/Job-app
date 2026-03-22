@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { initDb, getJobById, getUserProfile, getResumes, insertApplicationLog, updateJobStatus, getTodayApplyCount, getSearchConfig } from "@/lib/db";
-import { autoFillApplication, closeBrowser } from "@/lib/playwright";
+
+const IS_SERVERLESS = !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION_NAME || !!process.env.VERCEL;
 
 /**
  * POST /api/apply — trigger Playwright to auto-fill a job application
@@ -15,8 +16,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Check daily limit
-    const config = getSearchConfig();
-    const todayCount = getTodayApplyCount();
+    const config = await getSearchConfig();
+    const todayCount = await getTodayApplyCount();
     if (todayCount >= config.maxDailyApplies) {
       return NextResponse.json({
         success: false,
@@ -24,29 +25,34 @@ export async function POST(req: NextRequest) {
       }, { status: 429 });
     }
 
-    const job = getJobById(jobId);
+    const job = await getJobById(jobId);
     if (!job) {
       return NextResponse.json({ success: false, error: "Job not found" }, { status: 404 });
     }
 
-    const profile = getUserProfile();
+    const profile = await getUserProfile();
     if (!profile.fullName || !profile.email) {
       return NextResponse.json({ success: false, error: "Please configure your profile first." }, { status: 400 });
     }
 
-    const resumes = getResumes();
+    const resumes = await getResumes();
     const resume = resumes.find((r) => r.id === job.resumeUsed) ?? resumes[0];
     if (!resume) {
       return NextResponse.json({ success: false, error: "No resumes uploaded." }, { status: 400 });
     }
 
+    if (IS_SERVERLESS) {
+      return NextResponse.json({ success: false, error: "Auto-apply requires running the app locally (Playwright browser needed)." }, { status: 400 });
+    }
+
     const coverLetter = job.coverLetter ?? "";
 
     // Launch browser & auto-fill
+    const { autoFillApplication } = await import("@/lib/playwright");
     const result = await autoFillApplication(job, profile, resume, coverLetter);
 
     // Log the application attempt
-    insertApplicationLog({
+    await insertApplicationLog({
       jobId: job.id,
       jobTitle: job.title,
       company: job.company,
@@ -58,7 +64,7 @@ export async function POST(req: NextRequest) {
       appliedAt: new Date().toISOString(),
     });
 
-    updateJobStatus(job.id, result.success ? "applied" : "failed", result.message);
+    await updateJobStatus(job.id, result.success ? "applied" : "failed", result.message);
 
     return NextResponse.json({
       success: true,
@@ -77,6 +83,10 @@ export async function POST(req: NextRequest) {
  */
 export async function DELETE() {
   try {
+    if (IS_SERVERLESS) {
+      return NextResponse.json({ success: true, data: { message: "No browser to close in serverless." } });
+    }
+    const { closeBrowser } = await import("@/lib/playwright");
     await closeBrowser();
     return NextResponse.json({ success: true, data: { message: "Browser closed." } });
   } catch (error) {

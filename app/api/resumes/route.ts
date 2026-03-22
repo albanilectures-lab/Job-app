@@ -12,7 +12,7 @@ const UPLOAD_DIR = path.join(process.cwd(), "public", "resumes");
 export async function GET() {
   try {
     await initDb();
-    const resumes = getResumes();
+    const resumes = await getResumes();
     return NextResponse.json({ success: true, data: resumes });
   } catch (error) {
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
@@ -26,7 +26,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     await initDb();
-    const existing = getResumes();
+    const existing = await getResumes();
     if (existing.length >= MAX_RESUMES) {
       return NextResponse.json(
         { success: false, error: `Max ${MAX_RESUMES} resumes. Delete one first.` },
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
       ? skillsRaw.split(",").map((s) => s.trim()).filter(Boolean)
       : label.split(/[_,\s]+/).filter(Boolean);
 
-    const resume = insertResume({
+    const resume = await insertResume({
       filename,
       label,
       filePath,
@@ -85,7 +85,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: "Resume ID required" }, { status: 400 });
     }
 
-    const resumes = getResumes();
+    const resumes = await getResumes();
     const resume = resumes.find((r) => r.id === id);
     if (resume) {
       try {
@@ -95,7 +95,7 @@ export async function DELETE(req: NextRequest) {
       }
     }
 
-    deleteResume(id);
+    await deleteResume(id);
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 });

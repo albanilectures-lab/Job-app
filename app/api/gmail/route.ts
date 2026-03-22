@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, data: replies });
     }
 
-    const connected = isGmailConnected();
+    const connected = await isGmailConnected();
     return NextResponse.json({ success: true, data: { connected } });
   } catch (error) {
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 });

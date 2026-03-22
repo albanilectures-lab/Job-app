@@ -7,7 +7,7 @@ function getOAuth2Client() {
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI ?? "http://localhost:3000/api/gmail/callback"
+    process.env.GOOGLE_REDIRECT_URI ?? `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/gmail/callback`
   );
 }
 
@@ -34,7 +34,7 @@ export async function exchangeCode(code: string): Promise<void> {
     throw new Error("Missing tokens from Google OAuth exchange");
   }
 
-  saveGmailTokens(
+  await saveGmailTokens(
     tokens.access_token,
     tokens.refresh_token,
     tokens.expiry_date ?? Date.now() + 3600 * 1000
@@ -45,7 +45,7 @@ export async function exchangeCode(code: string): Promise<void> {
  * Get an authenticated Gmail client item (refreshing token if needed).
  */
 async function getGmailClient() {
-  const tokens = getGmailTokens();
+  const tokens = await getGmailTokens();
   if (!tokens) throw new Error("Gmail not connected. Please authenticate first.");
 
   const oauth2 = getOAuth2Client();
@@ -58,7 +58,7 @@ async function getGmailClient() {
   // Refresh if expired
   if (Date.now() >= tokens.expiresAt - 60000) {
     const { credentials } = await oauth2.refreshAccessToken();
-    saveGmailTokens(
+    await saveGmailTokens(
       credentials.access_token!,
       credentials.refresh_token ?? tokens.refreshToken,
       credentials.expiry_date ?? Date.now() + 3600 * 1000
@@ -108,7 +108,7 @@ export async function checkApplicationReplies(maxResults = 20) {
 /**
  * Check if Gmail is connected (tokens exist and are valid).
  */
-export function isGmailConnected(): boolean {
-  const tokens = getGmailTokens();
+export async function isGmailConnected(): Promise<boolean> {
+  const tokens = await getGmailTokens();
   return !!tokens && !!tokens.accessToken;
 }

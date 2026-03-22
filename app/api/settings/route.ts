@@ -8,8 +8,8 @@ import type { UserProfile, SearchConfig } from "@/lib/types";
 export async function GET() {
   try {
     await initDb();
-    const profile = getUserProfile();
-    const searchConfig = getSearchConfig();
+    const profile = await getUserProfile();
+    const searchConfig = await getSearchConfig();
     return NextResponse.json({ success: true, data: { profile, searchConfig } });
   } catch (error) {
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
@@ -28,12 +28,12 @@ export async function POST(req: NextRequest) {
     switch (action) {
       case "saveProfile": {
         const profile = body.profile as UserProfile;
-        updateUserProfile(profile);
+        await updateUserProfile(profile);
         return NextResponse.json({ success: true });
       }
       case "saveConfig": {
         const config = body.config as SearchConfig;
-        updateSearchConfig(config);
+        await updateSearchConfig(config);
         return NextResponse.json({ success: true });
       }
       default:

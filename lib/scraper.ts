@@ -47,7 +47,13 @@ export async function scrapeAllBoards(
   }
 
   // Filter and deduplicate
-  const filtered = allJobs.filter(filterJob).filter((j) => !jobUrlExists(j.url));
+  const validJobs = allJobs.filter(filterJob);
+  const filtered: Job[] = [];
+  for (const j of validJobs) {
+    if (!(await jobUrlExists(j.url))) {
+      filtered.push(j);
+    }
+  }
   console.log(`[Scraper] ${allJobs.length} total → ${filtered.length} after filtering`);
   return filtered;
 }

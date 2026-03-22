@@ -6,8 +6,8 @@ import { getApplicationLogs, getJobs, getUserProfile } from "./db";
  * Columns: No, Date, Job Title, Company, Stack, Bid Name, Salary Range, Site Link
  */
 export async function exportToExcel(): Promise<Buffer> {
-  const jobs = getJobs(undefined, 1000);
-  const profile = getUserProfile();
+  const jobs = await getJobs(undefined, 1000);
+  const profile = await getUserProfile();
   const bidName = profile.fullName || "—";
 
   const workbook = new ExcelJS.Workbook();
