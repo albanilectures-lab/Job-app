@@ -5,7 +5,7 @@ import { JOB_BOARD_CONFIGS, USER_AGENTS } from "./constants";
 import { randomPick, sleep } from "./utils";
 import { jobUrlExists, initDb } from "./db";
 import { filterJob } from "./filters";
-import { scrapeWithSession } from "./playwright";
+// Playwright is loaded dynamically only when needed (not available on serverless)
 
 const rssParser = new RssParser();
 
@@ -35,13 +35,15 @@ export async function scrapeAllBoards(
   await initDb();
   const allJobs: Job[] = [];
 
+  const IS_SERVERLESS = !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION_NAME || !!process.env.VERCEL;
+
   for (const board of boards) {
     try {
       console.log(`[Scraper] Fetching from ${board}...`);
       const jobs = await scrapeBoard(board, keywords);
       allJobs.push(...jobs);
-      // Respectful delay between boards
-      await sleep(2000 + Math.random() * 3000);
+      // Shorter delay on serverless to avoid function timeout
+      await sleep(IS_SERVERLESS ? 500 : 2000 + Math.random() * 3000);
     } catch (error) {
       console.error(`[Scraper] Error fetching ${board}:`, error);
     }
@@ -67,8 +69,15 @@ async function scrapeBoard(board: JobBoard, keywords: string[]): Promise<Job[]> 
       return scrapeRss(board, config.feedUrl!, keywords);
     case "json":
       return scrapeJson(board, config.feedUrl!, keywords);
-    case "login-required":
-      return scrapeWithSession(board, keywords);
+    case "login-required": {
+      try {
+        const { scrapeWithSession } = await import("./playwright");
+        return scrapeWithSession(board, keywords);
+      } catch {
+        console.warn(`[Scraper] Playwright not available, skipping ${board}`);
+        return [];
+      }
+    }
     case "scrape":
       return scrapeHtml(board, keywords);
     default:
