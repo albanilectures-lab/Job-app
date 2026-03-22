@@ -39,10 +39,15 @@ export async function initDb(): Promise<void> {
     "userId" TEXT NOT NULL DEFAULT 'admin',
     filename TEXT NOT NULL,
     label TEXT NOT NULL,
-    "filePath" TEXT NOT NULL,
+    "filePath" TEXT NOT NULL DEFAULT '',
+    "fileData" TEXT,
     skills TEXT NOT NULL DEFAULT '[]',
     "uploadedAt" TEXT NOT NULL
   )`;
+
+  // Add fileData column if missing (migration for existing DBs)
+  try { await sql`ALTER TABLE resumes ADD COLUMN IF NOT EXISTS "fileData" TEXT`; } catch {}
+  try { await sql`ALTER TABLE resumes ALTER COLUMN "filePath" SET DEFAULT ''`; } catch {}
 
   await sql`CREATE TABLE IF NOT EXISTS application_logs (
     id TEXT PRIMARY KEY,
@@ -140,12 +145,18 @@ export async function jobUrlExists(url: string, userId: string): Promise<boolean
 }
 
 // ─── Resumes ─────────────────────────────────────────────────
-export async function insertResume(resume: Omit<Resume, "id">, userId: string): Promise<Resume> {
+export async function insertResume(resume: Omit<Resume, "id">, userId: string, fileData?: string): Promise<Resume> {
   const id = uuid();
   const sql = getSQL();
-  await sql`INSERT INTO resumes (id, "userId", filename, label, "filePath", skills, "uploadedAt")
-    VALUES (${id}, ${userId}, ${resume.filename}, ${resume.label}, ${resume.filePath}, ${JSON.stringify(resume.skills)}, ${resume.uploadedAt})`;
+  await sql`INSERT INTO resumes (id, "userId", filename, label, "filePath", "fileData", skills, "uploadedAt")
+    VALUES (${id}, ${userId}, ${resume.filename}, ${resume.label}, ${resume.filePath}, ${fileData ?? null}, ${JSON.stringify(resume.skills)}, ${resume.uploadedAt})`;
   return { ...resume, id };
+}
+
+export async function getResumeFileData(id: string, userId: string): Promise<string | null> {
+  const sql = getSQL();
+  const rows = await sql`SELECT "fileData" FROM resumes WHERE id = ${id} AND "userId" = ${userId}`;
+  return rows[0]?.fileData ?? null;
 }
 
 export async function getResumes(userId: string): Promise<Resume[]> {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDb, getJobById, getUserProfile, getResumes, insertApplicationLog, updateJobStatus, getTodayApplyCount, getSearchConfig } from "@/lib/db";
+import { initDb, getJobById, getUserProfile, getResumes, getResumeFileData, insertApplicationLog, updateJobStatus, getTodayApplyCount, getSearchConfig } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
 
 const IS_SERVERLESS = !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION_NAME || !!process.env.VERCEL;
@@ -49,9 +49,23 @@ export async function POST(req: NextRequest) {
 
     const coverLetter = job.coverLetter ?? "";
 
+    // Write resume to temp file for Playwright (needs a real file path for setInputFiles)
+    const fileData = await getResumeFileData(resume.id, userId);
+    let tempFilePath = resume.filePath;
+    if (fileData) {
+      const os = await import("os");
+      const path = await import("path");
+      const { writeFile, mkdir } = await import("fs/promises");
+      const tmpDir = path.join(os.tmpdir(), "jobbot-resumes");
+      await mkdir(tmpDir, { recursive: true });
+      tempFilePath = path.join(tmpDir, resume.filename);
+      await writeFile(tempFilePath, Buffer.from(fileData, "base64"));
+    }
+    const resumeForPlaywright = { ...resume, filePath: tempFilePath };
+
     // Launch browser & auto-fill
     const { autoFillApplication } = await import("@/lib/playwright");
-    const result = await autoFillApplication(job, profile, resume, coverLetter);
+    const result = await autoFillApplication(job, profile, resumeForPlaywright, coverLetter);
 
     // Log the application attempt
     await insertApplicationLog({

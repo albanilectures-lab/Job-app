@@ -54,7 +54,7 @@ export default function ResumeUploader({ resumes, onUpload, onDelete, onProfileE
 
   const extractFromExisting = async (resume: Resume) => {
     try {
-      const res = await fetch(`/resumes/${resume.filename}`);
+      const res = await fetch(`/api/resumes?id=${resume.id}&file=1`);
       if (!res.ok) throw new Error("Could not fetch resume file");
       const blob = await res.blob();
       await extractProfileFromFile(blob, resume.filename);
