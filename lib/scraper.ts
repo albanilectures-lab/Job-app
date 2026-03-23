@@ -41,16 +41,29 @@ export async function scrapeAllBoards(
   const allJobs: Job[] = [];
 
   const IS_SERVERLESS = !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION_NAME || !!process.env.VERCEL;
-  log(`serverless=${IS_SERVERLESS}, boards=${boards.join(",")}, keywords=${keywords.join(",")}`);
+  // On serverless, skip login-required boards (need Playwright) and enforce a deadline
+  const DEADLINE_MS = IS_SERVERLESS ? 22000 : 120000;
 
-  for (const board of boards) {
+  // Filter boards for serverless compatibility
+  const activeBoards = IS_SERVERLESS
+    ? boards.filter((b) => JOB_BOARD_CONFIGS[b].type !== "login-required")
+    : boards;
+
+  log(`serverless=${IS_SERVERLESS}, boards=${activeBoards.join(",")} (${activeBoards.length}/${boards.length}), keywords=${keywords.length}`);
+
+  for (const board of activeBoards) {
+    // Check deadline — return what we have so far
+    if (Date.now() - startTime > DEADLINE_MS) {
+      log(`deadline reached (${DEADLINE_MS}ms), returning ${allJobs.length} jobs collected so far`);
+      break;
+    }
     try {
       log(`fetching ${board}...`);
       const jobs = await scrapeBoard(board, keywords);
       log(`${board}: got ${jobs.length} jobs`);
       allJobs.push(...jobs);
       // Shorter delay on serverless to avoid function timeout
-      await sleep(IS_SERVERLESS ? 200 : 2000 + Math.random() * 3000);
+      await sleep(IS_SERVERLESS ? 100 : 2000 + Math.random() * 3000);
     } catch (error) {
       log(`${board} ERROR: ${error}`);
     }
@@ -94,7 +107,12 @@ async function scrapeBoard(board: JobBoard, keywords: string[]): Promise<Job[]> 
 
 // ─── RSS Feed (We Work Remotely) ─────────────────────────────
 async function scrapeRss(board: JobBoard, feedUrl: string, keywords: string[]): Promise<Job[]> {
-  const feed = await rssParser.parseURL(feedUrl);
+  const feed = await Promise.race([
+    rssParser.parseURL(feedUrl),
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("RSS fetch timeout")), 7000)
+    ),
+  ]);
   const now = new Date().toISOString();
 
   return feed.items
@@ -120,9 +138,12 @@ async function scrapeRss(board: JobBoard, feedUrl: string, keywords: string[]): 
 
 // ─── JSON API (Remote OK) ────────────────────────────────────
 async function scrapeJson(board: JobBoard, apiUrl: string, keywords: string[]): Promise<Job[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 7000);
   const res = await fetch(apiUrl, {
     headers: { "User-Agent": randomPick(USER_AGENTS) },
-  });
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timeout));
 
   if (!res.ok) throw new Error(`HTTP ${res.status} from ${apiUrl}`);
   const data = await res.json();
@@ -164,9 +185,12 @@ async function scrapeHtml(board: JobBoard, keywords: string[]): Promise<Job[]> {
   try {
     // Use fetch + cheerio for lighter scraping first
     const searchUrl = buildSearchUrl(board, keywords);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7000);
     const res = await fetch(searchUrl, {
       headers: { "User-Agent": randomPick(USER_AGENTS) },
-    });
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout));
 
     if (!res.ok) {
       console.warn(`[Scraper] ${board} returned HTTP ${res.status}, skipping`);
