@@ -32,20 +32,27 @@ export async function scrapeAllBoards(
   keywords: string[],
   userId: string
 ): Promise<Job[]> {
+  const startTime = Date.now();
+  const log = (msg: string) => console.log(`[Scraper ${Date.now() - startTime}ms] ${msg}`);
+
+  log("initDb start");
   await initDb();
+  log("initDb done");
   const allJobs: Job[] = [];
 
   const IS_SERVERLESS = !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION_NAME || !!process.env.VERCEL;
+  log(`serverless=${IS_SERVERLESS}, boards=${boards.join(",")}, keywords=${keywords.join(",")}`);
 
   for (const board of boards) {
     try {
-      console.log(`[Scraper] Fetching from ${board}...`);
+      log(`fetching ${board}...`);
       const jobs = await scrapeBoard(board, keywords);
+      log(`${board}: got ${jobs.length} jobs`);
       allJobs.push(...jobs);
       // Shorter delay on serverless to avoid function timeout
-      await sleep(IS_SERVERLESS ? 500 : 2000 + Math.random() * 3000);
+      await sleep(IS_SERVERLESS ? 200 : 2000 + Math.random() * 3000);
     } catch (error) {
-      console.error(`[Scraper] Error fetching ${board}:`, error);
+      log(`${board} ERROR: ${error}`);
     }
   }
 

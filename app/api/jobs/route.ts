@@ -39,34 +39,50 @@ export async function GET(req: NextRequest) {
  * Body: { action: "scrape" | "analyze" | "updateStatus", ... }
  */
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  const log = (msg: string) => console.log(`[Jobs API ${Date.now() - startTime}ms] ${msg}`);
   try {
+    log("POST start");
     const userId = await requireUserId();
+    log("auth done");
     await initDb();
+    log("db init done");
     const body = await req.json();
     const { action } = body;
+    log(`action=${action}`);
 
     switch (action) {
       case "scrape": {
         const config = await getSearchConfig(userId);
+        log(`config: ${config.keywords.length} keywords, ${config.boards.length} boards`);
         if (config.keywords.length === 0) {
-          return NextResponse.json({ success: false, error: "No search keywords configured." }, { status: 400 });
+          return NextResponse.json({ success: false, error: "No search keywords configured. Go to Settings to add keywords." }, { status: 400 });
         }
         const boards = config.boards.length > 0 ? config.boards : (["weworkremotely", "remoteok"] as JobBoard[]);
-        const { scrapeAllBoards } = await import("@/lib/scraper");
-        const jobs = await scrapeAllBoards(boards, config.keywords, userId);
+        log(`scraping boards: ${boards.join(", ")}`);
+        try {
+          const { scrapeAllBoards } = await import("@/lib/scraper");
+          log("scraper imported");
+          const jobs = await scrapeAllBoards(boards, config.keywords, userId);
+          log(`scraped ${jobs.length} jobs`);
 
-        // Insert new jobs into DB
-        let inserted = 0;
-        for (const job of jobs) {
-          try {
-            await insertJob(job, userId);
-            inserted++;
-          } catch {
-            // Duplicate URL, skip
+          // Insert new jobs into DB
+          let inserted = 0;
+          for (const job of jobs) {
+            try {
+              await insertJob(job, userId);
+              inserted++;
+            } catch {
+              // Duplicate URL, skip
+            }
           }
-        }
+          log(`inserted ${inserted} jobs`);
 
-        return NextResponse.json({ success: true, data: { scraped: jobs.length, inserted } });
+          return NextResponse.json({ success: true, data: { scraped: jobs.length, inserted } });
+        } catch (scrapeErr) {
+          log(`scrape error: ${scrapeErr}`);
+          return NextResponse.json({ success: false, error: `Scrape failed: ${String(scrapeErr)}` }, { status: 500 });
+        }
       }
 
       case "analyze": {

@@ -69,14 +69,18 @@ export default function DashboardPage() {
     setStatus({ type: "info", title: "Scraping job boards...", detail: "Connecting to configured boards and fetching listings" });
     setScrapeStep("Connecting to job boards...");
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 55000);
       const res = await fetch("/api/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "scrape" }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`Server error ${res.status}: ${text.slice(0, 200)}`);
+        throw new Error(`Server error ${res.status}: ${text.slice(0, 300)}`);
       }
       const data = await res.json();
       if (data.success) {
@@ -89,8 +93,11 @@ export default function DashboardPage() {
       } else {
         setStatus({ type: "error", title: "Scrape failed", detail: data.error });
       }
-    } catch (err) {
-      setStatus({ type: "error", title: "Scrape error", detail: String(err) });
+    } catch (err: any) {
+      const detail = err?.name === "AbortError"
+        ? "Request timed out. The server may be overloaded or the function exceeded its time limit."
+        : String(err);
+      setStatus({ type: "error", title: "Scrape error", detail });
     } finally {
       setScraping(false);
       setScrapeStep("");
