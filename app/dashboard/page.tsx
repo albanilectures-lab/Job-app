@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import JobCard from "@/components/JobCard";
 import StatsBar from "@/components/StatsBar";
+import AIScout from "@/components/AIScout";
 import type { Job, JobStatus } from "@/lib/types";
-import { Search, Brain, Loader2, Filter, CheckCircle2, AlertCircle, X } from "lucide-react";
+import { Search, Brain, Loader2, Filter, CheckCircle2, AlertCircle, X, Sparkles } from "lucide-react";
 
 type FilterTab = "all" | "matched" | "applied" | "skipped" | "failed";
 
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   const [status, setStatus] = useState<StatusMessage | null>(null);
   const [scrapeStep, setScrapeStep] = useState("");
   const [analyzeProgress, setAnalyzeProgress] = useState({ current: 0, total: 0 });
+  const [view, setView] = useState<"jobs" | "scout">("jobs");
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -70,7 +72,7 @@ export default function DashboardPage() {
     setScrapeStep("Connecting to job boards...");
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 55000);
+      const timeout = setTimeout(() => controller.abort(), 90000);
       const res = await fetch("/api/jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -196,6 +198,30 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* View Switcher */}
+      <div className="flex items-center gap-1 bg-white rounded-lg p-1 border border-gray-200 w-fit">
+        <button
+          onClick={() => setView("jobs")}
+          className={`text-sm px-4 py-2 rounded-md font-medium flex items-center gap-1.5 transition-colors ${
+            view === "jobs" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <Search size={14} /> Jobs
+        </button>
+        <button
+          onClick={() => setView("scout")}
+          className={`text-sm px-4 py-2 rounded-md font-medium flex items-center gap-1.5 transition-colors ${
+            view === "scout" ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-100"
+          }`}
+        >
+          <Sparkles size={14} /> AI Scout
+        </button>
+      </div>
+
+      {view === "scout" ? (
+        <AIScout />
+      ) : (
+      <>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <div className="flex items-center gap-2">
@@ -309,6 +335,8 @@ export default function DashboardPage() {
             />
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );

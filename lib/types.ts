@@ -22,18 +22,16 @@ export type JobStatus = "new" | "matched" | "skipped" | "applied" | "failed" | "
 export type JobBoard =
   | "weworkremotely"
   | "remoteok"
-  | "nodesk"
+  | "remotive"
+  | "jobicy"
+  | "arbeitnow"
+  | "themuse"
   | "justremote"
   | "dailyremote"
   | "remoteco"
-  | "wellfound"
   | "contra"
   | "glassdoor"
-  | "dice"
-  | "ziprecruiter"
   | "builtin"
-  | "greenhouse"
-  | "lever"
   | "unitedhealthgroup";
 
 // ─── Resume Types ────────────────────────────────────────────

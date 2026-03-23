@@ -35,14 +35,9 @@ export async function scrapeAllBoards(
   const startTime = Date.now();
   const log = (msg: string) => console.log(`[Scraper ${Date.now() - startTime}ms] ${msg}`);
 
-  log("initDb start");
-  await initDb();
-  log("initDb done");
-  const allJobs: Job[] = [];
-
   const IS_SERVERLESS = !!process.env.NETLIFY || !!process.env.AWS_LAMBDA_FUNCTION_NAME || !!process.env.VERCEL;
-  // On serverless, skip login-required boards (need Playwright) and enforce a deadline
-  const DEADLINE_MS = IS_SERVERLESS ? 22000 : 120000;
+  // Deadline: leave headroom for DB insert + response on serverless
+  const DEADLINE_MS = IS_SERVERLESS ? 18000 : 45000;
 
   // Filter boards for serverless compatibility
   const activeBoards = IS_SERVERLESS
@@ -51,23 +46,26 @@ export async function scrapeAllBoards(
 
   log(`serverless=${IS_SERVERLESS}, boards=${activeBoards.join(",")} (${activeBoards.length}/${boards.length}), keywords=${keywords.length}`);
 
-  for (const board of activeBoards) {
-    // Check deadline — return what we have so far
-    if (Date.now() - startTime > DEADLINE_MS) {
-      log(`deadline reached (${DEADLINE_MS}ms), returning ${allJobs.length} jobs collected so far`);
-      break;
-    }
+  // Scrape all boards concurrently — collect results as they arrive
+  const allJobs: Job[] = [];
+  const scrapePromises = activeBoards.map(async (board) => {
     try {
       log(`fetching ${board}...`);
       const jobs = await scrapeBoard(board, keywords);
       log(`${board}: got ${jobs.length} jobs`);
       allJobs.push(...jobs);
-      // Shorter delay on serverless to avoid function timeout
-      await sleep(IS_SERVERLESS ? 100 : 2000 + Math.random() * 3000);
     } catch (error) {
       log(`${board} ERROR: ${error}`);
     }
-  }
+  });
+
+  // Wait for all boards to finish OR deadline, whichever comes first
+  await Promise.race([
+    Promise.allSettled(scrapePromises),
+    sleep(DEADLINE_MS).then(() => log(`deadline reached (${DEADLINE_MS}ms), collected ${allJobs.length} jobs so far`)),
+  ]);
+
+  log(`scraping phase done, ${allJobs.length} raw jobs`);
 
   // Filter and deduplicate
   const validJobs = allJobs.filter(filterJob);
@@ -136,54 +134,174 @@ async function scrapeRss(board: JobBoard, feedUrl: string, keywords: string[]): 
     }));
 }
 
-// ─── JSON API (Remote OK) ────────────────────────────────────
+// ─── JSON API ────────────────────────────────────────────────
 async function scrapeJson(board: JobBoard, apiUrl: string, keywords: string[]): Promise<Job[]> {
+  switch (board) {
+    case "remoteok":
+      return scrapeRemoteOk(apiUrl, keywords);
+    case "remotive":
+      return scrapeRemotive(apiUrl, keywords);
+    case "jobicy":
+      return scrapeJobicy(apiUrl, keywords);
+    case "arbeitnow":
+      return scrapeArbeitnow(apiUrl, keywords);
+    case "themuse":
+      return scrapeTheMuse(apiUrl, keywords);
+    default:
+      return [];
+  }
+}
+
+async function jsonFetch(url: string): Promise<any> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 7000);
-  const res = await fetch(apiUrl, {
+  const res = await fetch(url, {
     headers: { "User-Agent": randomPick(USER_AGENTS) },
     signal: controller.signal,
   }).finally(() => clearTimeout(timeout));
+  if (!res.ok) throw new Error(`HTTP ${res.status} from ${url}`);
+  return res.json();
+}
 
-  if (!res.ok) throw new Error(`HTTP ${res.status} from ${apiUrl}`);
-  const data = await res.json();
+function matchesKeywords(text: string, keywords: string[]): boolean {
+  const lower = text.toLowerCase();
+  return keywords.some((kw) =>
+    kw.toLowerCase().split(/[_\s]+/).every((word) => lower.includes(word))
+  );
+}
+
+async function scrapeRemoteOk(apiUrl: string, keywords: string[]): Promise<Job[]> {
+  const data = await jsonFetch(apiUrl);
   const now = new Date().toISOString();
-
-  // Remote OK returns array, first item is metadata
   const listings = Array.isArray(data) ? data.slice(1) : [];
 
   return listings
-    .filter((item: any) => {
-      const text = `${item.position ?? ""} ${item.description ?? ""} ${item.tags?.join(" ") ?? ""}`.toLowerCase();
-      return keywords.some((kw) =>
-        kw.toLowerCase().split(/[_\s]+/).every((word) => text.includes(word))
-      );
-    })
+    .filter((item: any) =>
+      matchesKeywords(`${item.position ?? ""} ${item.description ?? ""} ${item.tags?.join(" ") ?? ""}`, keywords)
+    )
     .map((item: any) => ({
       id: "",
       title: item.position ?? "Untitled",
       company: item.company ?? "Unknown",
-      description: item.description ?? "",
+      description: (item.description ?? "").slice(0, 500),
       url: item.url
         ? resolveUrl(item.url, "https://remoteok.com")
         : (item.id ? `https://remoteok.com/remote-jobs/${item.id}` : ""),
       location: item.location ?? "Remote",
       salary: item.salary_min && item.salary_max ? `$${item.salary_min}-$${item.salary_max}` : undefined,
-      source: board,
+      source: "remoteok" as JobBoard,
       scrapedAt: now,
       postedAt: item.date ?? undefined,
       status: "new" as const,
     }));
 }
 
-// ─── HTML Scraping (Playwright fallback) ─────────────────────
+async function scrapeRemotive(apiUrl: string, keywords: string[]): Promise<Job[]> {
+  const data = await jsonFetch(apiUrl);
+  const now = new Date().toISOString();
+  const jobs = data?.jobs ?? [];
+
+  return jobs
+    .filter((item: any) =>
+      matchesKeywords(`${item.title ?? ""} ${item.description ?? ""} ${item.tags?.join(" ") ?? ""} ${item.category ?? ""}`, keywords)
+    )
+    .map((item: any) => ({
+      id: "",
+      title: item.title ?? "Untitled",
+      company: item.company_name ?? "Unknown",
+      description: (item.description ?? "").replace(/<[^>]*>/g, "").slice(0, 500),
+      url: item.url ?? "",
+      location: item.candidate_required_location ?? "Remote",
+      salary: item.salary ?? undefined,
+      source: "remotive" as JobBoard,
+      scrapedAt: now,
+      postedAt: item.publication_date ?? undefined,
+      status: "new" as const,
+    }));
+}
+
+async function scrapeJobicy(apiUrl: string, keywords: string[]): Promise<Job[]> {
+  const data = await jsonFetch(apiUrl);
+  const now = new Date().toISOString();
+  const jobs = data?.jobs ?? [];
+
+  return jobs
+    .filter((item: any) =>
+      matchesKeywords(`${item.jobTitle ?? ""} ${item.jobDescription ?? ""} ${item.jobIndustry?.join(" ") ?? ""}`, keywords)
+    )
+    .map((item: any) => ({
+      id: "",
+      title: item.jobTitle ?? "Untitled",
+      company: item.companyName ?? "Unknown",
+      description: (item.jobDescription ?? "").replace(/<[^>]*>/g, "").slice(0, 500),
+      url: item.url ?? "",
+      location: item.jobGeo ?? "Remote",
+      salary: item.annualSalaryMin && item.annualSalaryMax
+        ? `$${item.annualSalaryMin}-$${item.annualSalaryMax}`
+        : undefined,
+      source: "jobicy" as JobBoard,
+      scrapedAt: now,
+      postedAt: item.pubDate ?? undefined,
+      status: "new" as const,
+    }));
+}
+
+async function scrapeArbeitnow(apiUrl: string, keywords: string[]): Promise<Job[]> {
+  const data = await jsonFetch(apiUrl);
+  const now = new Date().toISOString();
+  const jobs = data?.data ?? [];
+
+  return jobs
+    .filter((item: any) =>
+      matchesKeywords(`${item.title ?? ""} ${item.description ?? ""} ${item.tags?.join(" ") ?? ""}`, keywords)
+    )
+    .filter((item: any) => item.remote === true)
+    .map((item: any) => ({
+      id: "",
+      title: item.title ?? "Untitled",
+      company: item.company_name ?? "Unknown",
+      description: (item.description ?? "").replace(/<[^>]*>/g, "").slice(0, 500),
+      url: item.url ?? "",
+      location: item.location ?? "Remote",
+      source: "arbeitnow" as JobBoard,
+      scrapedAt: now,
+      postedAt: item.created_at ? new Date(item.created_at * 1000).toISOString() : undefined,
+      status: "new" as const,
+    }));
+}
+
+async function scrapeTheMuse(apiUrl: string, keywords: string[]): Promise<Job[]> {
+  // The Muse supports query params: ?category=Engineering&level=Senior&location=Flexible%20/%20Remote&page=0
+  const url = `${apiUrl}?category=Engineering&location=Flexible%20%2F%20Remote&page=0`;
+  const data = await jsonFetch(url);
+  const now = new Date().toISOString();
+  const results = data?.results ?? [];
+
+  return results
+    .filter((item: any) =>
+      matchesKeywords(`${item.name ?? ""} ${item.contents ?? ""} ${item.categories?.join(" ") ?? ""}`, keywords)
+    )
+    .map((item: any) => ({
+      id: "",
+      title: item.name ?? "Untitled",
+      company: item.company?.name ?? "Unknown",
+      description: (item.contents ?? "").replace(/<[^>]*>/g, "").slice(0, 500),
+      url: item.refs?.landing_page ?? "",
+      location: item.locations?.map((l: any) => l.name)?.join(", ") ?? "Remote",
+      source: "themuse" as JobBoard,
+      scrapedAt: now,
+      postedAt: item.publication_date ?? undefined,
+      status: "new" as const,
+    }));
+}
+
+// ─── HTML Scraping (cheerio) ─────────────────────────────────
 async function scrapeHtml(board: JobBoard, keywords: string[]): Promise<Job[]> {
   const config = JOB_BOARD_CONFIGS[board];
   const jobs: Job[] = [];
   const now = new Date().toISOString();
 
   try {
-    // Use fetch + cheerio for lighter scraping first
     const searchUrl = buildSearchUrl(board, keywords);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 7000);
@@ -248,46 +366,13 @@ async function scrapeHtml(board: JobBoard, keywords: string[]): Promise<Job[]> {
         });
         break;
 
-      case "nodesk":
-      case "wellfound":
       case "contra":
-        // Generic scraper for boards with varying structures
         $("a[href*='job'], a[href*='position'], .job-card, .job-listing").each((_, el) => {
           const title = $(el).text().trim().slice(0, 200);
           const url = $(el).attr("href") ?? "";
           if (title.length > 5 && url) {
             jobs.push({
               id: "", title, company: "See listing", description: "",
-              url: resolveUrl(url, config.baseUrl),
-              location: "Remote", source: board, scrapedAt: now, status: "new",
-            });
-          }
-        });
-        break;
-
-      case "dice":
-        $(".card, [data-cy='search-card'], .diceSearchResultPage-card").each((_, el) => {
-          const title = $(el).find("a.card-title-link, h5 a, [data-cy='card-title']").first().text().trim();
-          const company = $(el).find("[data-cy='search-result-company-name'], .card-company a").first().text().trim();
-          const url = $(el).find("a").first().attr("href") ?? "";
-          if (title && url) {
-            jobs.push({
-              id: "", title, company: company || "See listing", description: "",
-              url: resolveUrl(url, config.baseUrl),
-              location: "Remote", source: board, scrapedAt: now, status: "new",
-            });
-          }
-        });
-        break;
-
-      case "ziprecruiter":
-        $(".job_result, .job_content, article").each((_, el) => {
-          const title = $(el).find(".job_title, h2 a, .title").first().text().trim();
-          const company = $(el).find(".t_org_link, .company_name, .hiring_company").first().text().trim();
-          const url = $(el).find("a").first().attr("href") ?? "";
-          if (title && url) {
-            jobs.push({
-              id: "", title, company: company || "See listing", description: "",
               url: resolveUrl(url, config.baseUrl),
               location: "Remote", source: board, scrapedAt: now, status: "new",
             });
@@ -305,36 +390,6 @@ async function scrapeHtml(board: JobBoard, keywords: string[]): Promise<Job[]> {
               id: "", title, company: company || "See listing", description: "",
               url: resolveUrl(url, "https://builtin.com"),
               location: "Remote", source: board, scrapedAt: now, status: "new",
-            });
-          }
-        });
-        break;
-
-      case "greenhouse":
-        $(".opening, .job-post, [data-mapped='true']").each((_, el) => {
-          const title = $(el).find("a").first().text().trim();
-          const url = $(el).find("a").first().attr("href") ?? "";
-          const location = $(el).find(".location, span").last().text().trim();
-          if (title && url) {
-            jobs.push({
-              id: "", title, company: "See listing", description: "",
-              url: resolveUrl(url, "https://boards.greenhouse.io"),
-              location: location || "Remote", source: board, scrapedAt: now, status: "new",
-            });
-          }
-        });
-        break;
-
-      case "lever":
-        $(".posting, .posting-title").each((_, el) => {
-          const title = $(el).find("h5, a").first().text().trim();
-          const url = $(el).find("a").first().attr("href") ?? $(el).closest("a").attr("href") ?? "";
-          const location = $(el).find(".posting-categories .location, .workplaceTypes").first().text().trim();
-          if (title && url) {
-            jobs.push({
-              id: "", title, company: "See listing", description: "",
-              url: resolveUrl(url, "https://jobs.lever.co"),
-              location: location || "Remote", source: board, scrapedAt: now, status: "new",
             });
           }
         });
@@ -358,22 +413,10 @@ function buildSearchUrl(board: JobBoard, keywords: string[]): string {
       return `${config.baseUrl}/jobs/search?query=${encodeURIComponent(query)}`;
     case "remoteco":
       return `${config.baseUrl}/remote-jobs/developer/?search=${encodeURIComponent(query)}`;
-    case "nodesk":
-      return `${config.baseUrl}/remote-jobs/?search=${encodeURIComponent(query)}`;
-    case "wellfound":
-      return `${config.baseUrl}/role/r/software-engineer`;
     case "contra":
       return `${config.baseUrl}/search/projects?query=${encodeURIComponent(query)}`;
-    case "dice":
-      return `https://www.dice.com/jobs?q=${encodeURIComponent(query)}&location=Remote&radius=30&radiusUnit=mi&page=1&pageSize=20&filters.isRemote=true`;
-    case "ziprecruiter":
-      return `https://www.ziprecruiter.com/jobs-search?search=${encodeURIComponent(query)}&location=Remote`;
     case "builtin":
       return `https://builtin.com/jobs/remote?search=${encodeURIComponent(query)}`;
-    case "greenhouse":
-      return `https://boards.greenhouse.io/search?query=${encodeURIComponent(query)}`;
-    case "lever":
-      return `https://jobs.lever.co/search?query=${encodeURIComponent(query)}`;
     default:
       return config.baseUrl;
   }

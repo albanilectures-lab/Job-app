@@ -65,10 +65,29 @@ export const JOB_BOARD_CONFIGS: Record<
     requiresLogin: true,
     loginUrl: "https://remoteok.com/login",
   },
-  nodesk: {
-    name: "NoDesk",
-    baseUrl: "https://nodesk.co",
-    type: "scrape",
+  remotive: {
+    name: "Remotive",
+    baseUrl: "https://remotive.com",
+    feedUrl: "https://remotive.com/api/remote-jobs",
+    type: "json",
+  },
+  jobicy: {
+    name: "Jobicy",
+    baseUrl: "https://jobicy.com",
+    feedUrl: "https://jobicy.com/api/v2/remote-jobs",
+    type: "json",
+  },
+  arbeitnow: {
+    name: "Arbeitnow",
+    baseUrl: "https://arbeitnow.com",
+    feedUrl: "https://arbeitnow.com/api/job-board-api",
+    type: "json",
+  },
+  themuse: {
+    name: "The Muse",
+    baseUrl: "https://www.themuse.com",
+    feedUrl: "https://www.themuse.com/api/public/jobs",
+    type: "json",
   },
   justremote: {
     name: "JustRemote",
@@ -85,11 +104,6 @@ export const JOB_BOARD_CONFIGS: Record<
     baseUrl: "https://remote.co",
     type: "scrape",
   },
-  wellfound: {
-    name: "Wellfound (AngelList)",
-    baseUrl: "https://wellfound.com",
-    type: "scrape",
-  },
   contra: {
     name: "Contra",
     baseUrl: "https://contra.com",
@@ -103,29 +117,9 @@ export const JOB_BOARD_CONFIGS: Record<
     requiresLogin: true,
     loginUrl: "https://www.glassdoor.com/profile/login_input.htm",
   },
-  dice: {
-    name: "Dice",
-    baseUrl: "https://www.dice.com",
-    type: "scrape",
-  },
-  ziprecruiter: {
-    name: "ZipRecruiter",
-    baseUrl: "https://www.ziprecruiter.com",
-    type: "scrape",
-  },
   builtin: {
     name: "Built In",
     baseUrl: "https://builtin.com",
-    type: "scrape",
-  },
-  greenhouse: {
-    name: "Greenhouse",
-    baseUrl: "https://boards.greenhouse.io",
-    type: "scrape",
-  },
-  lever: {
-    name: "Lever",
-    baseUrl: "https://jobs.lever.co",
     type: "scrape",
   },
   unitedhealthgroup: {

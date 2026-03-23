@@ -132,6 +132,34 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: true });
       }
 
+      case "scout": {
+        const profile = await getUserProfile(userId);
+        if (!profile.skills?.length) {
+          return NextResponse.json({ success: false, error: "Set up your profile with skills first (Settings)." }, { status: 400 });
+        }
+        const { aiScoutSearch } = await import("@/lib/ai");
+        const result = await aiScoutSearch(profile);
+        return NextResponse.json({ success: true, data: result });
+      }
+
+      case "analyzeDescription": {
+        const { jobDescription, jobTitle, company } = body;
+        if (!jobDescription) {
+          return NextResponse.json({ success: false, error: "Paste a job description to analyze." }, { status: 400 });
+        }
+        const profile = await getUserProfile(userId);
+        const resumes = await getResumes(userId);
+        const { aiAnalyzeJobDescription } = await import("@/lib/ai");
+        const result = await aiAnalyzeJobDescription(
+          jobDescription,
+          jobTitle || "Unknown Position",
+          company || "Unknown Company",
+          profile,
+          resumes
+        );
+        return NextResponse.json({ success: true, data: result });
+      }
+
       default:
         return NextResponse.json({ success: false, error: `Unknown action: ${action}` }, { status: 400 });
     }

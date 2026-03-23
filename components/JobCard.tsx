@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Job } from "@/lib/types";
 import { cn, truncate } from "@/lib/utils";
-import { ExternalLink, Send, X, Edit3, ChevronDown, ChevronUp, ClipboardCopy, ClipboardCheck, User } from "lucide-react";
+import { ExternalLink, Send, X, Edit3, ChevronDown, ChevronUp, ClipboardCopy, ClipboardCheck, User, Download } from "lucide-react";
 
 interface ProfileDetails {
   fullName: string;
@@ -30,6 +30,22 @@ export default function JobCard({ job, onApply, onSkip, onEditCover }: JobCardPr
   const [showCopyPanel, setShowCopyPanel] = useState(false);
   const [profile, setProfile] = useState<ProfileDetails | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const downloadCoverLetterPdf = () => {
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><title>Cover Letter - ${job.title}</title>
+<style>body{font-family:Georgia,serif;max-width:700px;margin:40px auto;padding:20px;color:#222;line-height:1.7}
+h1{font-size:18px;margin-bottom:4px}p.meta{color:#666;font-size:13px;margin:2px 0 20px}
+.letter{white-space:pre-wrap;font-size:14px}
+@media print{body{margin:0;padding:30px}}</style></head><body>
+<h1>${job.title}</h1><p class="meta">${job.company} &mdash; ${new Date().toLocaleDateString()}</p>
+<hr style="border:none;border-top:1px solid #ccc;margin:16px 0">
+<div class="letter">${(job.coverLetter ?? "").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</div>
+</body></html>`);
+    w.document.close();
+    setTimeout(() => { w.print(); }, 400);
+  };
 
   const fetchProfile = useCallback(async () => {
     if (profile) return;
@@ -124,12 +140,20 @@ export default function JobCard({ job, onApply, onSkip, onEditCover }: JobCardPr
             <div className="mt-4">
               <div className="flex items-center justify-between mb-1">
                 <h4 className="text-sm font-medium text-gray-700">Generated Cover Letter</h4>
-                <button
-                  onClick={() => setEditingCover(!editingCover)}
-                  className="text-xs text-indigo-600 hover:underline flex items-center gap-1"
-                >
-                  <Edit3 size={12} /> {editingCover ? "Cancel" : "Edit"}
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={downloadCoverLetterPdf}
+                    className="text-xs text-emerald-600 hover:underline flex items-center gap-1"
+                  >
+                    <Download size={12} /> PDF
+                  </button>
+                  <button
+                    onClick={() => setEditingCover(!editingCover)}
+                    className="text-xs text-indigo-600 hover:underline flex items-center gap-1"
+                  >
+                    <Edit3 size={12} /> {editingCover ? "Cancel" : "Edit"}
+                  </button>
+                </div>
               </div>
               {editingCover ? (
                 <div>
