@@ -44,7 +44,7 @@ export interface Resume {
   uploadedAt: string;
 }
 
-// ─── User Profile ────────────────────────────────────────────
+// ─── User Profile (expanded) ─────────────────────────────────
 export interface UserProfile {
   fullName: string;
   email: string;
@@ -54,6 +54,52 @@ export interface UserProfile {
   portfolioUrl?: string;
   skills: string[];
   yearsExperience: number;
+  // New fields
+  currentTitle?: string;
+  country?: string;
+  state?: string;
+  city?: string;
+  postCode?: string;
+  availability?: "immediately" | "1week" | "2weeks" | "1month" | "2months";
+  workAuthCountries?: string[];
+  visaSponsorship?: boolean;
+  nationality?: string;
+  currentSalary?: number;
+  expectedSalary?: number;
+  hourlyRate?: number;
+  expectedHourlyRate?: number;
+  experienceSummary?: string;
+}
+
+// ─── Copilot Config ──────────────────────────────────────────
+export type CopilotMode = "manual-review" | "full-auto";
+export type JobType = "fulltime" | "part-time" | "contract" | "internship";
+export type SeniorityLevel = "entry" | "associate" | "mid-senior" | "director";
+
+export interface CopilotConfig {
+  mode: CopilotMode;
+  enabled: boolean;
+  matchThreshold: number; // 0-100
+  jobTypes: JobType[];
+  seniorityLevels: SeniorityLevel[];
+  remoteOnly: boolean;
+  timezones?: string[];
+  maxDailyApplies: number;
+  coverLetterMode: "auto-generate" | "upload-own";
+  onboardingComplete: boolean;
+}
+
+// ─── Copilot Run Log ─────────────────────────────────────────
+export interface CopilotRun {
+  id: string;
+  userId: string;
+  runAt: string;
+  boardsScraped: number;
+  jobsFound: number;
+  jobsMatched: number;
+  jobsApplied: number;
+  errors: string[];
+  durationMs: number;
 }
 
 // ─── Application Log ─────────────────────────────────────────
@@ -93,6 +139,43 @@ export interface FitAnalysis {
   missingSkills: string[];
   bestResumeId: string;
   coverLetter: string;
+}
+
+// ─── Resume Quality ──────────────────────────────────────────
+export interface ResumeScore {
+  overall: number; // 0-100
+  length: "too-short" | "good" | "too-long";
+  hasContactInfo: boolean;
+  hasSkillsSection: boolean;
+  hasExperienceSection: boolean;
+  hasEducationSection: boolean;
+  atsFriendly: boolean;
+  issues: string[];
+  tips: string[];
+}
+
+// ─── Screening Questions ─────────────────────────────────────
+export interface ScreeningQuestion {
+  id: string;
+  question: string;
+  answer: string;
+  category: "experience" | "availability" | "salary" | "legal" | "technical" | "general";
+}
+
+export interface ScreeningAnswers {
+  userId: string;
+  questions: ScreeningQuestion[];
+  updatedAt: string;
+}
+
+// ─── Autopilot Run Result ────────────────────────────────────
+export interface AutopilotResult {
+  boardsScraped: number;
+  jobsFound: number;
+  jobsMatched: number;
+  jobsApplied: number;
+  errors: string[];
+  durationMs: number;
 }
 
 // ─── API Responses ───────────────────────────────────────────

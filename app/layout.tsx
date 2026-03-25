@@ -3,8 +3,8 @@ import "./globals.css";
 import NavBar from "@/components/NavBar";
 
 export const metadata: Metadata = {
-  title: "Job App Automation",
-  description: "Automate remote job applications with AI-powered matching",
+  title: "JobPilot — AI Job Application Automation",
+  description: "Your AI copilot for automated job searching, matching, and applications",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

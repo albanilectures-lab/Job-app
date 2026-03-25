@@ -1,6 +1,6 @@
 import { neon } from "@neondatabase/serverless";
 import { v4 as uuid } from "uuid";
-import type { Job, ApplicationLog, Resume, UserProfile, SearchConfig, JobStatus } from "./types";
+import type { Job, ApplicationLog, Resume, UserProfile, SearchConfig, JobStatus, CopilotConfig, CopilotRun, ScreeningQuestion } from "./types";
 
 function getSQL() {
   const url = process.env.DATABASE_URL;
@@ -91,10 +91,62 @@ export async function initDb(): Promise<void> {
     "email" TEXT
   )`;
 
+  // ── Copilot Config table ──
+  await sql`CREATE TABLE IF NOT EXISTS copilot_config (
+    "userId" TEXT PRIMARY KEY,
+    mode TEXT NOT NULL DEFAULT 'manual-review',
+    enabled BOOLEAN NOT NULL DEFAULT false,
+    "matchThreshold" INTEGER NOT NULL DEFAULT 70,
+    "jobTypes" TEXT NOT NULL DEFAULT '["fulltime"]',
+    "seniorityLevels" TEXT NOT NULL DEFAULT '["mid-senior"]',
+    "remoteOnly" BOOLEAN NOT NULL DEFAULT true,
+    timezones TEXT NOT NULL DEFAULT '[]',
+    "maxDailyApplies" INTEGER NOT NULL DEFAULT 25,
+    "coverLetterMode" TEXT NOT NULL DEFAULT 'auto-generate',
+    "onboardingComplete" BOOLEAN NOT NULL DEFAULT false
+  )`;
+
+  // ── Copilot Run Log table ──
+  await sql`CREATE TABLE IF NOT EXISTS copilot_runs (
+    id TEXT PRIMARY KEY,
+    "userId" TEXT NOT NULL,
+    "runAt" TEXT NOT NULL,
+    "boardsScraped" INTEGER NOT NULL DEFAULT 0,
+    "jobsFound" INTEGER NOT NULL DEFAULT 0,
+    "jobsMatched" INTEGER NOT NULL DEFAULT 0,
+    "jobsApplied" INTEGER NOT NULL DEFAULT 0,
+    errors TEXT NOT NULL DEFAULT '[]',
+    "durationMs" INTEGER NOT NULL DEFAULT 0
+  )`;
+
+  // ── Migrate user_profile with new columns ──
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS "currentTitle" TEXT`; } catch {}
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS country TEXT`; } catch {}
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS state TEXT`; } catch {}
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS city TEXT`; } catch {}
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS "postCode" TEXT`; } catch {}
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS availability TEXT DEFAULT 'immediately'`; } catch {}
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS "workAuthCountries" TEXT DEFAULT '[]'`; } catch {}
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS "visaSponsorship" BOOLEAN DEFAULT false`; } catch {}
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS nationality TEXT`; } catch {}
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS "currentSalary" INTEGER`; } catch {}
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS "expectedSalary" INTEGER`; } catch {}
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS "hourlyRate" INTEGER`; } catch {}
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS "expectedHourlyRate" INTEGER`; } catch {}
+  try { await sql`ALTER TABLE user_profile ADD COLUMN IF NOT EXISTS "experienceSummary" TEXT`; } catch {}
+
   await sql`CREATE INDEX IF NOT EXISTS idx_jobs_user_status ON jobs("userId", status)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_jobs_user_source ON jobs("userId", source)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_logs_user_appliedAt ON application_logs("userId", "appliedAt")`;
   await sql`CREATE INDEX IF NOT EXISTS idx_resumes_user ON resumes("userId")`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_copilot_runs_user ON copilot_runs("userId", "runAt")`;
+
+  // ── Screening Answers table ──
+  await sql`CREATE TABLE IF NOT EXISTS screening_answers (
+    "userId" TEXT PRIMARY KEY,
+    questions TEXT NOT NULL DEFAULT '[]',
+    "updatedAt" TEXT NOT NULL DEFAULT ''
+  )`;
 }
 
 /** Ensure a user has profile & config seed rows */
@@ -102,6 +154,7 @@ export async function ensureUserRows(userId: string): Promise<void> {
   const sql = getSQL();
   await sql`INSERT INTO user_profile ("userId") VALUES (${userId}) ON CONFLICT ("userId") DO NOTHING`;
   await sql`INSERT INTO search_config ("userId") VALUES (${userId}) ON CONFLICT ("userId") DO NOTHING`;
+  await sql`INSERT INTO copilot_config ("userId") VALUES (${userId}) ON CONFLICT ("userId") DO NOTHING`;
 }
 
 // ─── Jobs ────────────────────────────────────────────────────
@@ -136,6 +189,12 @@ export async function getJobById(id: string, userId: string): Promise<Job | unde
   const sql = getSQL();
   const rows = await sql`SELECT * FROM jobs WHERE id = ${id} AND "userId" = ${userId}`;
   return rows[0] as any as Job | undefined;
+}
+
+export async function deleteAllJobs(userId: string): Promise<number> {
+  const sql = getSQL();
+  const rows = await sql`DELETE FROM jobs WHERE "userId" = ${userId} RETURNING id`;
+  return rows.length;
 }
 
 export async function jobUrlExists(url: string, userId: string): Promise<boolean> {
@@ -197,7 +256,30 @@ export async function getUserProfile(userId: string): Promise<UserProfile> {
   const rows = await sql`SELECT * FROM user_profile WHERE "userId" = ${userId}`;
   const row = rows[0] as any;
   if (!row) return { fullName: "", email: "", phone: "", skills: [], yearsExperience: 0 };
-  return { fullName: row.fullName, email: row.email, phone: row.phone, linkedinUrl: row.linkedinUrl, githubUrl: row.githubUrl, portfolioUrl: row.portfolioUrl, skills: JSON.parse(row.skills || "[]"), yearsExperience: row.yearsExperience };
+  return {
+    fullName: row.fullName,
+    email: row.email,
+    phone: row.phone,
+    linkedinUrl: row.linkedinUrl,
+    githubUrl: row.githubUrl,
+    portfolioUrl: row.portfolioUrl,
+    skills: JSON.parse(row.skills || "[]"),
+    yearsExperience: row.yearsExperience,
+    currentTitle: row.currentTitle ?? undefined,
+    country: row.country ?? undefined,
+    state: row.state ?? undefined,
+    city: row.city ?? undefined,
+    postCode: row.postCode ?? undefined,
+    availability: row.availability ?? "immediately",
+    workAuthCountries: JSON.parse(row.workAuthCountries || "[]"),
+    visaSponsorship: row.visaSponsorship ?? false,
+    nationality: row.nationality ?? undefined,
+    currentSalary: row.currentSalary ?? undefined,
+    expectedSalary: row.expectedSalary ?? undefined,
+    hourlyRate: row.hourlyRate ?? undefined,
+    expectedHourlyRate: row.expectedHourlyRate ?? undefined,
+    experienceSummary: row.experienceSummary ?? undefined,
+  };
 }
 
 export async function updateUserProfile(profile: UserProfile, userId: string): Promise<void> {
@@ -210,7 +292,21 @@ export async function updateUserProfile(profile: UserProfile, userId: string): P
     "githubUrl" = ${profile.githubUrl ?? null},
     "portfolioUrl" = ${profile.portfolioUrl ?? null},
     skills = ${JSON.stringify(profile.skills)},
-    "yearsExperience" = ${profile.yearsExperience}
+    "yearsExperience" = ${profile.yearsExperience},
+    "currentTitle" = ${profile.currentTitle ?? null},
+    country = ${profile.country ?? null},
+    state = ${profile.state ?? null},
+    city = ${profile.city ?? null},
+    "postCode" = ${profile.postCode ?? null},
+    availability = ${profile.availability ?? "immediately"},
+    "workAuthCountries" = ${JSON.stringify(profile.workAuthCountries ?? [])},
+    "visaSponsorship" = ${profile.visaSponsorship ?? false},
+    nationality = ${profile.nationality ?? null},
+    "currentSalary" = ${profile.currentSalary ?? null},
+    "expectedSalary" = ${profile.expectedSalary ?? null},
+    "hourlyRate" = ${profile.hourlyRate ?? null},
+    "expectedHourlyRate" = ${profile.expectedHourlyRate ?? null},
+    "experienceSummary" = ${profile.experienceSummary ?? null}
     WHERE "userId" = ${userId}`;
 }
 
@@ -256,4 +352,79 @@ export async function saveGmailTokens(accessToken: string, refreshToken: string,
 export async function isGmailConnected(userId: string): Promise<{ connected: boolean; email?: string }> {
   const t = await getGmailTokens(userId);
   return { connected: !!t, email: t?.email ?? undefined };
+}
+
+// ─── Copilot Config ──────────────────────────────────────────
+export async function getCopilotConfig(userId: string): Promise<CopilotConfig> {
+  const sql = getSQL();
+  const rows = await sql`SELECT * FROM copilot_config WHERE "userId" = ${userId}`;
+  const row = rows[0] as any;
+  if (!row) return { mode: "manual-review", enabled: false, matchThreshold: 70, jobTypes: ["fulltime"], seniorityLevels: ["mid-senior"], remoteOnly: true, timezones: [], maxDailyApplies: 25, coverLetterMode: "auto-generate", onboardingComplete: false };
+  return {
+    mode: row.mode ?? "manual-review",
+    enabled: row.enabled ?? false,
+    matchThreshold: row.matchThreshold ?? 70,
+    jobTypes: JSON.parse(row.jobTypes || '["fulltime"]'),
+    seniorityLevels: JSON.parse(row.seniorityLevels || '["mid-senior"]'),
+    remoteOnly: row.remoteOnly ?? true,
+    timezones: JSON.parse(row.timezones || "[]"),
+    maxDailyApplies: row.maxDailyApplies ?? 25,
+    coverLetterMode: row.coverLetterMode ?? "auto-generate",
+    onboardingComplete: row.onboardingComplete ?? false,
+  };
+}
+
+export async function updateCopilotConfig(config: CopilotConfig, userId: string): Promise<void> {
+  const sql = getSQL();
+  await sql`UPDATE copilot_config SET
+    mode = ${config.mode},
+    enabled = ${config.enabled},
+    "matchThreshold" = ${config.matchThreshold},
+    "jobTypes" = ${JSON.stringify(config.jobTypes)},
+    "seniorityLevels" = ${JSON.stringify(config.seniorityLevels)},
+    "remoteOnly" = ${config.remoteOnly},
+    timezones = ${JSON.stringify(config.timezones ?? [])},
+    "maxDailyApplies" = ${config.maxDailyApplies},
+    "coverLetterMode" = ${config.coverLetterMode},
+    "onboardingComplete" = ${config.onboardingComplete}
+    WHERE "userId" = ${userId}`;
+}
+
+// ─── Copilot Run Log ─────────────────────────────────────────
+export async function insertCopilotRun(run: Omit<CopilotRun, "id">, userId: string): Promise<CopilotRun> {
+  const id = uuid();
+  const sql = getSQL();
+  await sql`INSERT INTO copilot_runs (id, "userId", "runAt", "boardsScraped", "jobsFound", "jobsMatched", "jobsApplied", errors, "durationMs")
+    VALUES (${id}, ${userId}, ${run.runAt}, ${run.boardsScraped}, ${run.jobsFound}, ${run.jobsMatched}, ${run.jobsApplied}, ${JSON.stringify(run.errors)}, ${run.durationMs})`;
+  return { ...run, id };
+}
+
+export async function getRecentCopilotRuns(userId: string, limit = 10): Promise<CopilotRun[]> {
+  const sql = getSQL();
+  const rows = await sql`SELECT * FROM copilot_runs WHERE "userId" = ${userId} ORDER BY "runAt" DESC LIMIT ${limit}`;
+  return rows.map((r: any) => ({ ...r, errors: JSON.parse(r.errors || "[]") }));
+}
+
+// ─── Screening Answers ───────────────────────────────────────
+export async function getScreeningAnswers(userId: string): Promise<ScreeningQuestion[]> {
+  const sql = getSQL();
+  const rows = await sql`SELECT * FROM screening_answers WHERE "userId" = ${userId}`;
+  const row = rows[0] as any;
+  if (!row) return [];
+  return JSON.parse(row.questions || "[]");
+}
+
+export async function saveScreeningAnswers(userId: string, questions: ScreeningQuestion[]): Promise<void> {
+  const sql = getSQL();
+  const now = new Date().toISOString();
+  await sql`INSERT INTO screening_answers ("userId", questions, "updatedAt")
+    VALUES (${userId}, ${JSON.stringify(questions)}, ${now})
+    ON CONFLICT ("userId") DO UPDATE SET questions = ${JSON.stringify(questions)}, "updatedAt" = ${now}`;
+}
+
+// ─── Utility: get all enabled users for autopilot ──────────
+export async function getAutopilotUsers(): Promise<string[]> {
+  const sql = getSQL();
+  const rows = await sql`SELECT "userId" FROM copilot_config WHERE enabled = true AND "onboardingComplete" = true`;
+  return rows.map((r: any) => r.userId);
 }

@@ -16,9 +16,14 @@ const SESSIONS_DIR = path.join(DATA_DIR, "sessions");
 const FORM_MAPS_PATH = path.join(DATA_DIR, "form-maps.json");
 const BROWSER_PROFILE_DIR = path.join(DATA_DIR, "browser-profile");
 
+/** CDP port for connecting to an already-running Chrome instance */
+const CDP_PORT = parseInt(process.env.CDP_PORT ?? "9222", 10);
+
 let browserInstance: Browser | null = null;
 let contextInstance: BrowserContext | null = null;
 let currentSessionBoard: string | null = null;
+/** true when we connected via CDP (don't close the user's browser) */
+let isCdpConnection = false;
 
 // ─── Session Management ──────────────────────────────────────
 
@@ -108,18 +113,42 @@ export async function launchBrowser(board?: string): Promise<BrowserContext> {
       // Context is dead — clean up references
       contextInstance = null;
       browserInstance = null;
+      isCdpConnection = false;
     }
   }
 
   // Close existing context if switching boards
   if (contextInstance) {
-    if (currentSessionBoard) {
+    if (!isCdpConnection && currentSessionBoard) {
       try { await saveSession(currentSessionBoard); } catch { /* ignore */ }
     }
-    try { await contextInstance.close(); } catch { /* already closed */ }
+    if (!isCdpConnection) {
+      try { await contextInstance.close(); } catch { /* already closed */ }
+    }
     contextInstance = null;
     browserInstance = null;
+    isCdpConnection = false;
   }
+
+  // ── Strategy 1: Connect to user's running Chrome via CDP ───
+  // Start Chrome with: chrome.exe --remote-debugging-port=9222
+  // This opens new tabs in your existing browser instead of launching a new one.
+  try {
+    const cdpUrl = `http://127.0.0.1:${CDP_PORT}`;
+    const browser = await playwrightChromium.connectOverCDP(cdpUrl);
+    browserInstance = browser;
+    // Use the browser's default (first) context — this has all your cookies/sessions
+    contextInstance = browser.contexts()[0] ?? await browser.newContext();
+    isCdpConnection = true;
+    currentSessionBoard = board ?? null;
+    console.log(`[Browser] Connected to existing Chrome via CDP on port ${CDP_PORT}`);
+    return contextInstance;
+  } catch {
+    console.log("[Browser] CDP connection failed (Chrome not running with --remote-debugging-port?). Launching standalone browser...");
+  }
+
+  // ── Strategy 2: Fall back to launching a new browser ────────
+  isCdpConnection = false;
 
   ensureDir(BROWSER_PROFILE_DIR);
 
@@ -188,7 +217,7 @@ export async function launchBrowser(board?: string): Promise<BrowserContext> {
 
   currentSessionBoard = board ?? null;
 
-  // Inject saved session cookies if available
+  // Inject saved session cookies if available (not needed in CDP mode — browser already has them)
   if (board) {
     const sessionPath = getSessionPath(board);
     if (fs.existsSync(sessionPath)) {
@@ -232,6 +261,18 @@ export async function launchBrowser(board?: string): Promise<BrowserContext> {
 }
 
 export async function closeBrowser(): Promise<void> {
+  if (isCdpConnection) {
+    // CDP mode: disconnect from the user's browser but don't close it
+    if (browserInstance) {
+      try { await browserInstance.close(); } catch { /* already disconnected */ }
+      browserInstance = null;
+    }
+    contextInstance = null;
+    currentSessionBoard = null;
+    isCdpConnection = false;
+    console.log("[Browser] Disconnected from CDP (browser stays open)");
+    return;
+  }
   if (contextInstance) {
     if (currentSessionBoard) {
       try { await saveSession(currentSessionBoard); } catch { /* ignore if already closed */ }

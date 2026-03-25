@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { initDb, getSearchConfig, insertJob, getJobs, updateJobStatus, updateJobFit, getJobById, getUserProfile, getResumes, getTodayApplyCount, ensureUserRows } from "@/lib/db";
+import { initDb, getSearchConfig, insertJob, getJobs, updateJobStatus, updateJobFit, getJobById, getUserProfile, getResumes, getTodayApplyCount, ensureUserRows, deleteAllJobs } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
 import type { JobStatus, JobBoard } from "@/lib/types";
 
@@ -29,6 +29,20 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(req.nextUrl.searchParams.get("limit") ?? "200", 10);
     const jobs = await getJobs(userId, status ?? undefined, limit);
     return NextResponse.json({ success: true, data: jobs });
+  } catch (error) {
+    return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/jobs — clear all jobs for current user
+ */
+export async function DELETE() {
+  try {
+    const userId = await requireUserId();
+    await initDb();
+    const count = await deleteAllJobs(userId);
+    return NextResponse.json({ success: true, data: { deleted: count } });
   } catch (error) {
     return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
   }

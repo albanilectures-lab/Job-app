@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Briefcase, LayoutDashboard, Settings, Download, LogOut, User } from "lucide-react";
+import { Zap, LayoutDashboard, Settings, Download, LogOut, User, Sparkles } from "lucide-react";
 
 export default function NavBar() {
   const [user, setUser] = useState<{ username: string; displayName: string } | null>(null);
@@ -30,12 +30,13 @@ export default function NavBar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-14">
           <Link href="/" className="flex items-center gap-2 font-bold text-lg text-indigo-600">
-            <Briefcase size={22} />
-            <span className="hidden sm:inline">JobBot</span>
+            <Zap size={22} />
+            <span className="hidden sm:inline">JobPilot</span>
           </Link>
 
           <nav className="flex items-center gap-1">
             <NavLink href="/dashboard" icon={<LayoutDashboard size={16} />} label="Dashboard" />
+            <NavLink href="/onboarding" icon={<Sparkles size={16} />} label="Copilot" />
             <NavLink href="/settings" icon={<Settings size={16} />} label="Settings" />
             <a
               href="/api/export"
