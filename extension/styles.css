@@ -1,0 +1,91 @@
+/* ─── JobPilot Content Script Styles ────────────────────────── */
+
+/* Floating Auto-Fill Button */
+#jobpilot-float-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: 50px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.4);
+  transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+  user-select: none;
+}
+
+#jobpilot-float-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(14, 165, 233, 0.5);
+}
+
+#jobpilot-float-btn:active {
+  transform: translateY(0);
+}
+
+#jobpilot-float-btn.jobpilot-loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+#jobpilot-float-btn.jobpilot-loading span::after {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: 6px;
+  border: 2px solid transparent;
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: jobpilot-spin 0.6s linear infinite;
+  vertical-align: middle;
+}
+
+@keyframes jobpilot-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Status Overlay */
+#jobpilot-status {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  padding: 12px 24px;
+  background: #0f172a;
+  color: #38bdf8;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid #1e293b;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  animation: jobpilot-slide-in 0.3s ease;
+}
+
+#jobpilot-status.jobpilot-fade-out {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-10px);
+  transition: opacity 0.5s, transform 0.5s;
+}
+
+@keyframes jobpilot-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}

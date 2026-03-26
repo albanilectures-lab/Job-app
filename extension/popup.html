@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JobPilot</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 340px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 16px;
+    }
+    h1 {
+      font-size: 18px;
+      color: #38bdf8;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    h1 .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      display: inline-block;
+    }
+    h1 .dot.connected { background: #22c55e; }
+    h1 .dot.disconnected { background: #ef4444; }
+
+    /* Login form */
+    #login-section, #main-section { display: none; }
+    #login-section.active, #main-section.active { display: block; }
+
+    label {
+      display: block;
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 4px;
+      margin-top: 10px;
+    }
+    input, select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      background: #1e293b;
+      color: #e2e8f0;
+      font-size: 13px;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: #38bdf8; }
+
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 12px;
+      transition: opacity 0.2s;
+    }
+    .btn:hover { opacity: 0.9; }
+    .btn-primary { background: #38bdf8; color: #0f172a; }
+    .btn-danger { background: #ef4444; color: #fff; font-size: 12px; padding: 6px; margin-top: 8px; }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
+
+    .status-msg {
+      font-size: 12px;
+      margin-top: 8px;
+      padding: 6px 8px;
+      border-radius: 4px;
+    }
+    .status-msg.error { background: #7f1d1d; color: #fca5a5; }
+    .status-msg.success { background: #14532d; color: #86efac; }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .info-row .label { color: #94a3b8; }
+    .info-row .value { color: #e2e8f0; font-weight: 500; }
+
+    .section-title {
+      font-size: 14px;
+      color: #38bdf8;
+      margin: 14px 0 6px;
+      font-weight: 600;
+    }
+
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+    }
+    .toggle-row span { font-size: 13px; }
+
+    .toggle {
+      position: relative;
+      width: 40px;
+      height: 22px;
+    }
+    .toggle input { display: none; }
+    .toggle .slider {
+      position: absolute;
+      inset: 0;
+      background: #334155;
+      border-radius: 11px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .toggle .slider::before {
+      content: '';
+      position: absolute;
+      width: 16px; height: 16px;
+      left: 3px; top: 3px;
+      background: #e2e8f0;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked + .slider { background: #38bdf8; }
+    .toggle input:checked + .slider::before { transform: translateX(18px); }
+
+    .footer {
+      margin-top: 14px;
+      font-size: 11px;
+      color: #64748b;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Login Section -->
+  <div id="login-section" class="active">
+    <h1>🚀 JobPilot <span class="dot disconnected" id="login-dot"></span></h1>
+
+    <label for="app-url">App URL</label>
+    <input type="url" id="app-url" value="http://localhost:3000" placeholder="http://localhost:3000">
+
+    <label for="username">Username</label>
+    <input type="text" id="username" placeholder="admin">
+
+    <label for="password">Password</label>
+    <input type="password" id="password" placeholder="password">
+
+    <button class="btn btn-primary" id="login-btn">Connect</button>
+    <div id="login-status"></div>
+  </div>
+
+  <!-- Main Section (after login) -->
+  <div id="main-section">
+    <h1>🚀 JobPilot <span class="dot connected" id="main-dot"></span></h1>
+
+    <div class="info-row">
+      <span class="label">User</span>
+      <span class="value" id="display-name">—</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Profile</span>
+      <span class="value" id="profile-name">—</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Resumes</span>
+      <span class="value" id="resume-count">0</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Screening Q&A</span>
+      <span class="value" id="screening-count">0</span>
+    </div>
+
+    <div class="section-title">Default Resume</div>
+    <select id="default-resume"></select>
+
+    <div class="section-title">Options</div>
+    <div class="toggle-row">
+      <span>Auto-detect forms</span>
+      <label class="toggle">
+        <input type="checkbox" id="auto-detect" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <span>Auto-show fill button</span>
+      <label class="toggle">
+        <input type="checkbox" id="auto-show-btn" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+
+    <button class="btn btn-primary" id="fill-now-btn">Fill Current Page</button>
+    <button class="btn btn-secondary" id="refresh-btn">Refresh Data</button>
+    <button class="btn btn-danger" id="logout-btn">Disconnect</button>
+
+    <div id="main-status"></div>
+    <div class="footer">JobPilot Chrome Extension v1.0</div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

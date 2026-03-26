@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { initDb, ensureUserRows, getUserProfile, getResumes, getScreeningAnswers, saveScreeningAnswers, getResumeFileData } from "@/lib/db";
 import { requireUserId } from "@/lib/session";
 import { generateDefaultScreeningAnswers, aiAnswerScreeningQuestions } from "@/lib/screening";
+import { generateCoverLetter } from "@/lib/ai";
 import { scoreResume } from "@/lib/resume-scoring";
 import type { ScreeningQuestion } from "@/lib/types";
 import { v4 as uuid } from "uuid";
@@ -142,6 +143,38 @@ export async function POST(req: NextRequest) {
         const filtered = existing.filter((q) => q.id !== id);
         await saveScreeningAnswers(userId, filtered);
         return NextResponse.json({ success: true, data: { answers: filtered } });
+      }
+
+      case "generate-cover-letter": {
+        const { jobDescription, jobTitle, company } = body as {
+          jobDescription: string;
+          jobTitle?: string;
+          company?: string;
+        };
+        if (!jobDescription) {
+          return NextResponse.json({ success: false, error: "jobDescription required" }, { status: 400 });
+        }
+        const profile = await getUserProfile(userId);
+        const resumes = await getResumes(userId);
+        const resume = resumes[0]; // use primary resume
+        if (!resume) {
+          return NextResponse.json({ success: false, error: "No resume found" }, { status: 400 });
+        }
+        const job = {
+          id: "ext-cover-letter",
+          title: jobTitle || "Position",
+          company: company || "Company",
+          description: jobDescription,
+          url: "",
+          source: "weworkremotely" as const,
+          postedAt: new Date().toISOString(),
+          scrapedAt: new Date().toISOString(),
+          location: "",
+          salary: "",
+          status: "new" as const,
+        };
+        const coverLetter = await generateCoverLetter(job, profile, resume);
+        return NextResponse.json({ success: true, data: { coverLetter } });
       }
 
       default:

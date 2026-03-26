@@ -18,9 +18,25 @@ export function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // Support auth via cookie OR X-Session header (for Chrome extension)
   const cookie = req.cookies.get(SESSION_COOKIE);
-  const user = cookie?.value ? decodeSession(cookie.value) : null;
+  const headerSession = req.headers.get("x-session");
+  const sessionValue = cookie?.value || headerSession || "";
+  const user = sessionValue ? decodeSession(sessionValue) : null;
   const isValid = user && ACCOUNTS.find((a) => a.username === user.username);
+
+  // Handle CORS preflight for extension requests
+  if (req.method === "OPTIONS" && pathname.startsWith("/api/")) {
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": req.headers.get("origin") || "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, X-Session",
+        "Access-Control-Max-Age": "86400",
+      },
+    });
+  }
 
   if (!isValid) {
     // API routes return 401
@@ -33,7 +49,18 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+
+  // Add CORS headers for API routes (extension support)
+  if (pathname.startsWith("/api/")) {
+    const origin = req.headers.get("origin");
+    if (origin) {
+      response.headers.set("Access-Control-Allow-Origin", origin);
+      response.headers.set("Access-Control-Allow-Headers", "Content-Type, X-Session");
+    }
+  }
+
+  return response;
 }
 
 export const config = {
